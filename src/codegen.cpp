@@ -2095,7 +2095,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                 for(i=0; i < nargs; i++) {
                     // paranoia: make sure the inferred tuple type matches what
                     // we are about to construct.
-                    if (!jl_types_equal(jl_datatype_field(rt1,i), expr_type(args[i+1],ctx)))
+                    if (!jl_types_equal(jl_field_type(rt1,i), expr_type(args[i+1],ctx)))
                         break;
                 }
                 if (i >= nargs) {
@@ -2112,7 +2112,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                             continue;
                         }
                         assert(tpl != NULL);
-                        Value *elt = emit_unbox(ety,emit_unboxed(args[i+1],ctx),jl_datatype_field(rt1,i));
+                        Value *elt = emit_unbox(ety,emit_unboxed(args[i+1],ctx),jl_field_type(rt1,i));
                         tpl = emit_tupleset(tpl,ConstantInt::get(T_size,i),elt,rt1,ctx);
                     }
                     JL_GC_POP();
