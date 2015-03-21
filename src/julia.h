@@ -576,6 +576,7 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 #define jl_field_offset(st,i)  (((jl_datatype_t*)st)->fields[i].offset)
 #define jl_field_size(st,i)    (((jl_datatype_t*)st)->fields[i].size)
 #define jl_field_isptr(st,i)   (((jl_datatype_t*)st)->fields[i].isptr)
+#define jl_field_name(st,i)    jl_svecref(((jl_datatype_t*)st)->name->names, (i))
 #define jl_field_type(st,i)    jl_svecref(((jl_datatype_t*)st)->types, (i))
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
 #define jl_datatype_nfields(t) jl_svec_len(((jl_datatype_t*)(t))->types)
@@ -643,7 +644,7 @@ STATIC_INLINE int jl_is_bitstype(void *v)
 STATIC_INLINE int jl_is_structtype(void *v)
 {
     return (jl_is_datatype(v) &&
-            (jl_svec_len(((jl_datatype_t*)v)->name->names) > 0 ||
+            (jl_datatype_nfields(v) > 0 ||
              ((jl_datatype_t*)(v))->size == 0) &&
             !((jl_datatype_t*)(v))->abstract);
 }
@@ -656,7 +657,7 @@ STATIC_INLINE int jl_isbits(void *t)   // corresponding to isbits() in julia
 
 STATIC_INLINE int jl_is_datatype_singleton(jl_datatype_t *d)
 {
-    return (!d->abstract && d->size == 0 && (d->names==jl_null || !d->mutabl));
+    return (!d->abstract && d->size == 0 && (d->names==jl_emptysvec || !d->mutabl));
 }
 
 STATIC_INLINE int jl_is_abstracttype(void *v)

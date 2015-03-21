@@ -1479,7 +1479,7 @@ static bool is_getfield_nonallocating(jl_datatype_t *ty, jl_value_t *fld)
     }
     for(size_t i=0; i < jl_svec_len(ty->types); i++) {
         if (!(ty->fields[i].isptr ||
-              (name && name != (jl_sym_t*)jl_svecref(ty->names,i)))) {
+              (name && name != jl_field_name(ty,i)))) {
             return false;
         }
     }
@@ -2318,14 +2318,14 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         jl_datatype_t *stt = (jl_datatype_t*)expr_type(args[1], ctx);
         jl_value_t *fldt   = expr_type(args[2], ctx);
         if (jl_is_structtype(stt) && fldt == (jl_value_t*)jl_long_type && !jl_subtype((jl_value_t*)jl_module_type, (jl_value_t*)stt, 0)) {
-            size_t nfields = jl_svec_len(stt->names);
+            size_t nfields = jl_datatype_nfields(stt);
             // integer index
             if (jl_is_long(args[2])) {
                 // known index
                 size_t idx = jl_unbox_long(args[2])-1;
                 if (idx < nfields) {
                     Value *fld = emit_getfield(args[1],
-                                               (jl_sym_t*)jl_svecref(stt->names, idx),
+                                               (jl_sym_t*)jl_field_name(stt, i),
                                                ctx);
                     JL_GC_POP();
                     return fld;
@@ -2452,7 +2452,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
             // this is issue #8798
             sty != jl_datatype_type) {
             if (jl_is_leaf_type((jl_value_t*)sty) ||
-                (sty->names == jl_null && sty->size > 0)) {
+                (sty->name->names == jl_emptysvec && sty->size > 0)) {
                 JL_GC_POP();
                 return ConstantInt::get(T_size, sty->size);
             }

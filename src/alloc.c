@@ -211,7 +211,7 @@ DLLEXPORT void jl_pointerset(jl_value_t *p, jl_value_t *x, jl_value_t *i)
 
 int jl_field_index(jl_datatype_t *t, jl_sym_t *fld, int err)
 {
-    jl_svec_t *fn = t->names;
+    jl_svec_t *fn = t->name->names;
     for(size_t i=0; i < jl_svec_len(fn); i++) {
         if (jl_svecref(fn,i) == (jl_value_t*)fld) {
             return (int)i;
@@ -585,8 +585,8 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
     if(super != NULL) gc_wb(t, t->super);
     t->parameters = parameters;
     gc_wb(t, t->parameters);
-    t->names = fnames;
-    gc_wb(t, t->names);
+    t->name->names = fnames;
+    gc_wb(t, t->name->names);
     t->types = ftypes;
     if(ftypes != NULL) gc_wb(t, t->types);
     t->abstract = abstract;

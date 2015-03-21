@@ -1857,7 +1857,6 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     ndt->super = jl_any_type;
     ndt->parameters = p;
     gc_wb(ndt, ndt->parameters);
-    gc_wb(ndt, ndt->names);
     ndt->types = istuple ? p : jl_emptysvec; // to be filled in below
     ndt->mutabl = dt->mutabl;
     ndt->abstract = dt->abstract;
