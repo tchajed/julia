@@ -250,7 +250,7 @@ static Type *jl_llvmtuple_eltype(Type *tuple, jl_value_t *jt, size_t i)
     else if (tuple == T_void)
         ety = T_void;
     else if (tuple->isStructTy())
-        ety = julia_type_to_llvm(jl_tupleref((jl_tuple_t*)jt,i));
+        ety = julia_type_to_llvm(jl_svecref((jl_svec_t*)jt,i));
     else
         assert(false);
     return ety;
@@ -298,7 +298,7 @@ static Value *emit_unbox(Type *to, Value *x, jl_value_t *jt)
             if (ety == T_void)
                 continue;
             Value *ref = emit_tupleref(x,ConstantInt::get(T_size,i),jt,NULL);
-            Value *elt = emit_unbox(ety,ref,jl_tupleref(jt,i));
+            Value *elt = emit_unbox(ety,ref,jl_svecref(jt,i));
             tpl = emit_tupleset(tpl,ConstantInt::get(T_size,i),elt,jt,NULL);
         }
         return tpl;
