@@ -74,7 +74,7 @@ jl_value_t *jl_eval_global_var(jl_module_t *m, jl_sym_t *e)
     return v;
 }
 
-void jl_check_static_parameter_conflicts(jl_lambda_info_t *li, jl_tuple_t *t, jl_sym_t *fname);
+void jl_check_static_parameter_conflicts(jl_lambda_info_t *li, jl_svec_t *t, jl_sym_t *fname);
 
 int jl_has_intrinsics(jl_expr_t *e);
 
@@ -93,7 +93,7 @@ static int equiv_type(jl_datatype_t *dta, jl_datatype_t *dtb)
             dta->mutabl == dtb->mutabl &&
             dta->size == dtb->size &&
             jl_egal((jl_value_t*)dta->super, (jl_value_t*)dtb->super) &&
-            jl_egal((jl_value_t*)dta->names, (jl_value_t*)dtb->names) &&
+            jl_egal((jl_value_t*)dta->name->names, (jl_value_t*)dtb->name->names) &&
             jl_egal((jl_value_t*)dta->parameters, (jl_value_t*)dtb->parameters));
 }
 
@@ -298,10 +298,10 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         JL_GC_PUSH2(&atypes, &meth);
         atypes = eval(args[1], locals, nl, ngensym);
         if (jl_is_lambda_info(args[2])) {
-            jl_check_static_parameter_conflicts((jl_lambda_info_t*)args[2], (jl_tuple_t*)jl_t1(atypes), fname);
+            jl_check_static_parameter_conflicts((jl_lambda_info_t*)args[2], (jl_svec_t*)jl_svecref(atypes,1), fname);
         }
         meth = eval(args[2], locals, nl, ngensym);
-        jl_method_def(fname, bp, bp_owner, b, (jl_tuple_t*)atypes, (jl_function_t*)meth, args[3], NULL, kw);
+        jl_method_def(fname, bp, bp_owner, b, (jl_svec_t*)atypes, (jl_function_t*)meth, args[3], NULL, kw);
         JL_GC_POP();
         return *bp;
     }
@@ -336,9 +336,9 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         jl_value_t *temp = NULL;
         jl_datatype_t *dt = NULL;
         JL_GC_PUSH4(&para, &super, &temp, &dt);
-        assert(jl_is_tuple(para));
+        assert(jl_is_svec(para));
         assert(jl_is_symbol(name));
-        dt = jl_new_abstracttype(name, jl_any_type, (jl_tuple_t*)para);
+        dt = jl_new_abstracttype(name, jl_any_type, (jl_svec_t*)para);
         jl_binding_t *b = jl_get_binding_wr(jl_current_module, (jl_sym_t*)name);
         temp = b->value;
         check_can_assign_type(b);
@@ -360,7 +360,7 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         JL_GC_PUSH4(&para, &super, &temp, &dt);
         assert(jl_is_symbol(name));
         para = eval(args[1], locals, nl, ngensym);
-        assert(jl_is_tuple(para));
+        assert(jl_is_svec(para));
         vnb  = eval(args[2], locals, nl, ngensym);
         if (!jl_is_long(vnb))
             jl_errorf("invalid declaration of bits type %s", ((jl_sym_t*)name)->name);
@@ -368,7 +368,7 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         if (nb < 1 || nb>=(1<<23) || (nb&7) != 0)
             jl_errorf("invalid number of bits in type %s",
                       ((jl_sym_t*)name)->name);
-        dt = jl_new_bitstype(name, jl_any_type, (jl_tuple_t*)para, nb);
+        dt = jl_new_bitstype(name, jl_any_type, (jl_svec_t*)para, nb);
         jl_binding_t *b = jl_get_binding_wr(jl_current_module, (jl_sym_t*)name);
         temp = b->value;
         check_can_assign_type(b);
@@ -387,14 +387,14 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         jl_value_t *name = args[0];
         assert(jl_is_symbol(name));
         jl_value_t *para = eval(args[1], locals, nl, ngensym);
-        assert(jl_is_tuple(para));
+        assert(jl_is_svec(para));
         jl_value_t *temp = NULL;
         jl_value_t *super = NULL;
         jl_datatype_t *dt = NULL;
         JL_GC_PUSH4(&para, &super, &temp, &dt);
         temp = eval(args[2], locals, nl, ngensym);  // field names
-        dt = jl_new_datatype((jl_sym_t*)name, jl_any_type, (jl_tuple_t*)para,
-                             (jl_tuple_t*)temp, NULL,
+        dt = jl_new_datatype((jl_sym_t*)name, jl_any_type, (jl_svec_t*)para,
+                             (jl_svec_t*)temp, NULL,
                              0, args[5]==jl_true ? 1 : 0, jl_unbox_long(args[6]));
 
         jl_binding_t *b = jl_get_binding_wr(jl_current_module, (jl_sym_t*)name);
@@ -407,10 +407,10 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
         JL_TRY {
             // operations that can fail
             inside_typedef = 1;
-            dt->types = (jl_tuple_t*)eval(args[4], locals, nl, ngensym);
+            dt->types = (jl_svec_t*)eval(args[4], locals, nl, ngensym);
             gc_wb(dt, dt->types);
             inside_typedef = 0;
-            jl_check_type_tuple(dt->types, dt->name->name, "type definition");
+            //jl_check_type_tuple(dt->types, dt->name->name, "type definition");
             super = eval(args[3], locals, nl, ngensym);
             jl_set_datatype_super(dt, super);
         }
@@ -418,11 +418,11 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
             b->value = temp;
             jl_rethrow();
         }
-        for(size_t i=0; i < jl_tuple_len(para); i++) {
-            ((jl_tvar_t*)jl_tupleref(para,i))->bound = 0;
+        for(size_t i=0; i < jl_svec_len(para); i++) {
+            ((jl_tvar_t*)jl_svecref(para,i))->bound = 0;
         }
         jl_compute_field_offsets(dt);
-        if (para == (jl_value_t*)jl_null && jl_is_datatype_singleton(dt))
+        if (para == (jl_value_t*)jl_emptysvec && jl_is_datatype_singleton(dt))
             dt->instance = newstruct(dt);
 
         b->value = temp;

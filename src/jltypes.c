@@ -2899,9 +2899,9 @@ void jl_init_types(void)
     jl_typename_type->name->primary = (jl_value_t*)jl_typename_type;
     jl_typename_type->super = jl_any_type;
     jl_typename_type->parameters = jl_emptysvec;
-    jl_typename_type->name->names = jl_svec(4, jl_symbol("name"), jl_symbol("module"),
-                                            jl_symbol("primary"), jl_symbol("cache"));
-    jl_typename_type->types = jl_svec(4, jl_sym_type, jl_any_type,
+    jl_typename_type->name->names = jl_svec(5, jl_symbol("name"), jl_symbol("module"),
+                                            jl_symbol("names"), jl_symbol("primary"), jl_symbol("cache"));
+    jl_typename_type->types = jl_svec(5, jl_sym_type, jl_any_type, jl_simplevector_type,
                                       jl_type_type, jl_any_type);
     jl_typename_type->va = 0;
     jl_typename_type->uid = jl_assign_type_uid();

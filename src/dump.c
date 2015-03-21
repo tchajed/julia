@@ -77,7 +77,7 @@ static jl_fptr_t id_to_fptrs[] = {
 static jl_array_t *tree_literal_values=NULL; // (only used in MODE_AST)
 
 static const ptrint_t LongSymbol_tag = 23;
-static const ptrint_t LongTuple_tag  = 24;
+static const ptrint_t LongSvec_tag   = 24;
 static const ptrint_t LongExpr_tag   = 25;
 static const ptrint_t LiteralVal_tag = 26;
 static const ptrint_t SmallInt64_tag = 27;
@@ -180,7 +180,8 @@ uint64_t jl_sysimage_base = 0;
 #include <dbghelp.h>
 #endif
 
-DLLEXPORT int jl_running_on_valgrind() {
+DLLEXPORT int jl_running_on_valgrind()
+{
     return RUNNING_ON_VALGRIND;
 }
 
@@ -412,11 +413,11 @@ static void jl_serialize_datatype(ios_t *s, jl_datatype_t *dt)
         jl_serialize_value(s, dt->parameters);
         return;
     }
-    size_t nf = jl_tuple_len(dt->names);
+    size_t nf = jl_datatype_nfields(dt);
     write_uint16(s, nf);
     write_int32(s, dt->size);
     int has_instance = !!(dt->instance != NULL);
-    write_uint8(s, dt->abstract | (dt->mutabl<<1) | (dt->pointerfree<<2) | (has_instance<<3));
+    write_uint8(s, dt->abstract | (dt->mutabl<<1) | (dt->pointerfree<<2) | (has_instance<<3) | (dt->va<<4));
     if (!dt->abstract) {
         write_uint16(s, dt->ninitialized);
         if (mode != MODE_MODULE && mode != MODE_MODULE_LAMBDAS) {
@@ -428,7 +429,6 @@ static void jl_serialize_datatype(ios_t *s, jl_datatype_t *dt)
     if (nf > 0) {
         write_int32(s, dt->alignment);
         ios_write(s, (char*)&dt->fields[0], nf*sizeof(jl_fielddesc_t));
-        jl_serialize_value(s, dt->names);
         jl_serialize_value(s, dt->types);
     }
 
@@ -494,7 +494,7 @@ static int is_ast_node(jl_value_t *v)
         return 0;
     }
     return jl_is_symbol(v) || jl_is_symbolnode(v) || jl_is_gensym(v) ||
-        jl_is_expr(v) || jl_is_newvarnode(v) ||
+        jl_is_expr(v) || jl_is_newvarnode(v) || jl_is_svec(v) ||
         jl_typeis(v, jl_array_any_type) || jl_is_tuple(v) ||
         jl_is_uniontype(v) || jl_is_int32(v) || jl_is_int64(v) ||
         jl_is_bool(v) || jl_is_typevar(v) ||
@@ -561,18 +561,18 @@ static void jl_serialize_value_(ios_t *s, jl_value_t *v)
     }
 
     size_t i;
-    if (jl_is_tuple(v)) {
-        size_t l = jl_tuple_len(v);
+    if (jl_is_svec(v)) {
+        size_t l = jl_svec_len(v);
         if (l <= 255) {
-            writetag(s, jl_tuple_type);
+            writetag(s, jl_simplevector_type);
             write_uint8(s, (uint8_t)l);
         }
         else {
-            writetag(s, (jl_value_t*)LongTuple_tag);
+            writetag(s, (jl_value_t*)LongSvec_tag);
             write_int32(s, l);
         }
         for(i=0; i < l; i++) {
-            jl_serialize_value(s, jl_tupleref(v, i));
+            jl_serialize_value(s, jl_svecref(v, i));
         }
     }
     else if (jl_is_symbol(v)) {
@@ -736,7 +736,7 @@ static void jl_serialize_value_(ios_t *s, jl_value_t *v)
                     return;
                 }
             }
-            size_t nf = jl_tuple_len(t->names);
+            size_t nf = jl_datatype_nfields(t);
             if (nf == 0 && jl_datatype_size(t)>0) {
                 if (t->name == jl_pointer_type->name) {
                     write_int32(s, 0);
@@ -804,10 +804,10 @@ static void jl_serialize_methtable_from_mod(ios_t *s, jl_module_t *m, jl_sym_t *
         write_int8(s, iskw);
         jl_serialize_value(s, ml->sig);
         jl_serialize_value(s, ml->func);
-        if (jl_is_tuple(ml->tvars))
+        if (jl_is_svec(ml->tvars))
             jl_serialize_value(s, ml->tvars);
         else
-            jl_serialize_value(s, jl_tuple1(ml->tvars));
+            jl_serialize_value(s, jl_svec1(ml->tvars));
         write_int8(s, ml->isstaged);
         chain = chain->next;
     }
@@ -863,7 +863,7 @@ static jl_value_t *jl_deserialize_datatype(ios_t *s, int pos, jl_value_t **loc)
         jl_typename_t *name = (jl_typename_t*)jl_deserialize_value(s, NULL);
         jl_value_t *dtv = name->primary;
         if (tag == 7) {
-            jl_tuple_t *parameters = (jl_tuple_t*)jl_deserialize_value(s, NULL);
+            jl_svec_t *parameters = (jl_svec_t*)jl_deserialize_value(s, NULL);
             dtv = jl_apply_type(dtv, parameters);
             backref_list.items[pos] = dtv;
         }
@@ -888,6 +888,7 @@ static jl_value_t *jl_deserialize_datatype(ios_t *s, int pos, jl_value_t **loc)
     dt->abstract = flags&1;
     dt->mutabl = (flags>>1)&1;
     dt->pointerfree = (flags>>2)&1;
+    dt->va = (flags>>4)&1;
     if (!dt->abstract) {
         dt->ninitialized = read_uint16(s);
         dt->uid = mode != MODE_MODULE && mode != MODE_MODULE_LAMBDAS ? read_int32(s) : 0;
@@ -917,18 +918,16 @@ static jl_value_t *jl_deserialize_datatype(ios_t *s, int pos, jl_value_t **loc)
     if (nf > 0) {
         dt->alignment = read_int32(s);
         ios_read(s, (char*)&dt->fields[0], nf*sizeof(jl_fielddesc_t));
-        dt->names = (jl_tuple_t*)jl_deserialize_value(s, (jl_value_t**)&dt->names);
-        gc_wb(dt, dt->names);
-        dt->types = (jl_tuple_t*)jl_deserialize_value(s, (jl_value_t**)&dt->types);
+        dt->types = (jl_svec_t*)jl_deserialize_value(s, (jl_value_t**)&dt->types);
         gc_wb(dt, dt->types);
     }
     else {
         dt->alignment = dt->size;
         if (dt->alignment > MAX_ALIGN)
             dt->alignment = MAX_ALIGN;
-        dt->names = dt->types = jl_null;
+        dt->types = jl_emptysvec;
     }
-    dt->parameters = (jl_tuple_t*)jl_deserialize_value(s, (jl_value_t**)&dt->parameters);
+    dt->parameters = (jl_svec_t*)jl_deserialize_value(s, (jl_value_t**)&dt->parameters);
     gc_wb(dt, dt->parameters);
     dt->name = (jl_typename_t*)jl_deserialize_value(s, (jl_value_t**)&dt->name);
     gc_wb(dt, dt->name);
@@ -937,8 +936,8 @@ static jl_value_t *jl_deserialize_datatype(ios_t *s, int pos, jl_value_t **loc)
     if (datatype_list) {
         if (dt->name == jl_array_type->name || dt->name == jl_ref_type->name ||
             dt->name == jl_pointer_type->name || dt->name == jl_type_type->name ||
-            dt->name == jl_vararg_type->name || dt->name == jl_abstractarray_type->name ||
-            dt->name == jl_densearray_type->name) {
+            dt->name == jl_simplevector_type->name || dt->name == jl_abstractarray_type->name ||
+            dt->name == jl_densearray_type->name || dt->name == jl_tuple_typename) {
             // builtin types are not serialized, so their caches aren't
             // explicitly saved. so we reconstruct the caches of builtin
             // parametric types here.
@@ -1000,21 +999,21 @@ static jl_value_t *jl_deserialize_value_(ios_t *s, jl_value_t *vtag, jl_value_t 
     int usetable = (mode != MODE_AST);
 
     size_t i;
-    if (vtag == (jl_value_t*)jl_tuple_type ||
-        vtag == (jl_value_t*)LongTuple_tag) {
+    if (vtag == (jl_value_t*)jl_simplevector_type ||
+        vtag == (jl_value_t*)LongSvec_tag) {
         size_t len;
-        if (vtag == (jl_value_t*)jl_tuple_type)
+        if (vtag == (jl_value_t*)jl_simplevector_type)
             len = read_uint8(s);
         else
             len = read_int32(s);
-        jl_tuple_t *tu = jl_alloc_tuple_uninit(len);
+        jl_svec_t *sv = jl_alloc_svec_uninit(len);
         if (usetable)
-            arraylist_push(&backref_list, (jl_value_t*)tu);
-        jl_value_t **data = tu->data;
+            arraylist_push(&backref_list, (jl_value_t*)sv);
+        jl_value_t **data = sv->data;
         for(i=0; i < len; i++) {
             data[i] = jl_deserialize_value(s, &data[i]);
         }
-        return (jl_value_t*)tu;
+        return (jl_value_t*)sv;
     }
     else if (vtag == (jl_value_t*)CommonSym_tag) {
         int tag = read_uint8(s);
@@ -1132,13 +1131,13 @@ static jl_value_t *jl_deserialize_value_(ios_t *s, jl_value_t *vtag, jl_value_t 
             arraylist_push(&backref_list, li);
         li->ast = jl_deserialize_value(s, &li->ast);
         gc_wb(li, li->ast);
-        li->sparams = (jl_tuple_t*)jl_deserialize_value(s, (jl_value_t**)&li->sparams);
+        li->sparams = (jl_svec_t*)jl_deserialize_value(s, (jl_value_t**)&li->sparams);
         gc_wb(li, li->sparams);
         li->tfunc = jl_deserialize_value(s, (jl_value_t**)&li->tfunc);
         gc_wb(li, li->tfunc);
         li->name = (jl_sym_t*)jl_deserialize_value(s, NULL);
         gc_wb(li, li->name);
-        li->specTypes = (jl_tuple_t*)jl_deserialize_value(s, (jl_value_t**)&li->specTypes);
+        li->specTypes = (jl_tupletype_t*)jl_deserialize_value(s, (jl_value_t**)&li->specTypes);
         if(li->specTypes) gc_wb(li, li->specTypes);
         li->specializations = (jl_array_t*)jl_deserialize_value(s, (jl_value_t**)&li->specializations);
         if(li->specializations) gc_wb(li, li->specializations);
@@ -1255,7 +1254,7 @@ static jl_value_t *jl_deserialize_value_(ios_t *s, jl_value_t *vtag, jl_value_t 
                 return v;
             }
         }
-        size_t nf = jl_tuple_len(dt->names);
+        size_t nf = jl_datatype_nfields(dt);
         jl_value_t *v;
         if (nf == 0 && jl_datatype_size(dt)>0) {
             int nby = jl_datatype_size(dt);
@@ -1351,9 +1350,9 @@ void jl_deserialize_lambdas_from_mod(ios_t *s)
             gf = jl_gf_mtable(gf)->kwsorter;
             assert(jl_is_gf(gf));
         }
-        jl_tuple_t *types = (jl_tuple_t*)jl_deserialize_value(s, NULL);
+        jl_tupletype_t *types = (jl_tupletype_t*)jl_deserialize_value(s, NULL);
         jl_function_t *meth = (jl_function_t*)jl_deserialize_value(s, NULL);
-        jl_tuple_t *tvars = (jl_tuple_t*)jl_deserialize_value(s, NULL);
+        jl_svec_t *tvars = (jl_svec_t*)jl_deserialize_value(s, NULL);
         int8_t isstaged = read_int8(s);
         jl_add_method(gf, types, meth, tvars, isstaged);
     }
@@ -1653,7 +1652,7 @@ int jl_save_new_module(const char *fname, jl_module_t *mod)
     return 0;
 }
 
-jl_function_t *jl_method_cache_insert(jl_methtable_t *mt, jl_tuple_t *type,
+jl_function_t *jl_method_cache_insert(jl_methtable_t *mt, jl_tupletype_t *type,
                                       jl_function_t *method);
 
 DLLEXPORT
@@ -1800,8 +1799,8 @@ void jl_init_serializer(void)
     htable_new(&backref_table, 0);
 
     void *tags[] = { jl_symbol_type, jl_gensym_type, jl_datatype_type,
-                     jl_function_type, jl_tuple_type, jl_array_type,
-                     jl_expr_type, (void*)LongSymbol_tag, (void*)LongTuple_tag,
+                     jl_function_type, jl_simplevector_type, jl_array_type,
+                     jl_expr_type, (void*)LongSymbol_tag, (void*)LongSvec_tag,
                      (void*)LongExpr_tag, (void*)LiteralVal_tag,
                      (void*)SmallInt64_tag, (void*)IdTable_tag,
                      (void*)Int32_tag, (void*)Array1d_tag, (void*)Singleton_tag,
@@ -1892,20 +1891,20 @@ void jl_init_serializer(void)
                      jl_labelnode_type, jl_linenumbernode_type,
                      jl_gotonode_type, jl_quotenode_type, jl_topnode_type,
                      jl_type_type, jl_bottom_type, jl_ref_type, jl_pointer_type,
-                     jl_vararg_type, jl_ntuple_type, jl_abstractarray_type,
+                     jl_ntuple_type, jl_abstractarray_type,
                      jl_densearray_type, jl_box_type, jl_void_type,
                      jl_typector_type, jl_typename_type,
                      jl_task_type, jl_uniontype_type, jl_typetype_type, jl_typetype_tvar,
                      jl_ANY_flag, jl_array_any_type, jl_intrinsic_type, jl_method_type,
                      jl_methtable_type, jl_voidpointer_type, jl_newvarnode_type,
-                     jl_array_symbol_type, jl_tupleref(jl_tuple_type,0),
+                     jl_array_symbol_type, jl_anytuple_type,
 
-                     jl_symbol_type->name, jl_gensym_type->name,
-                     jl_ref_type->name, jl_pointer_type->name,
+                     jl_symbol_type->name, jl_gensym_type->name, jl_tuple_typename,
+                     jl_ref_type->name, jl_pointer_type->name, jl_simplevector_type->name,
                      jl_datatype_type->name, jl_uniontype_type->name, jl_array_type->name,
                      jl_expr_type->name, jl_typename_type->name, jl_type_type->name,
                      jl_methtable_type->name, jl_method_type->name, jl_tvar_type->name,
-                     jl_vararg_type->name, jl_ntuple_type->name, jl_abstractarray_type->name,
+                     jl_ntuple_type->name, jl_abstractarray_type->name,
                      jl_densearray_type->name, jl_void_type->name, jl_lambda_info_type->name,
                      jl_module_type->name, jl_box_type->name, jl_function_type->name,
                      jl_typector_type->name, jl_intrinsic_type->name, jl_task_type->name,
@@ -1943,7 +1942,7 @@ void jl_init_serializer(void)
         jl_symbol("#s286"),                 jl_symbol("rest"),
         jl_symbol("_expr"),                 jl_symbol("region"),
         jl_symbol("#s285"),                 jl_symbol("reduce.jl"),
-        jl_symbol("Vararg"),                jl_symbol("offset"),
+        jl_symbol("offset"),
         jl_symbol("count"),                 jl_symbol("flags"),
         jl_symbol("vals"),                  jl_symbol("catdims"),
         jl_symbol("#s32"),                  jl_symbol("copy"),
@@ -2007,7 +2006,7 @@ void jl_init_serializer(void)
         jl_symbol("static_typeof"),         jl_symbol("Function"),
         jl_symbol("or_int"),                jl_symbol("#s245"),
         jl_symbol("similar"),               jl_symbol("multimedia.jl"),
-        jl_symbol("Vararg"),                jl_symbol("joinpath"),
+        jl_symbol("joinpath"),
         jl_symbol("stream"),                jl_symbol("diag"),
         jl_symbol("value"),                 jl_symbol("olds"),
         jl_symbol("item"),                  jl_symbol("checked_ssub"),
