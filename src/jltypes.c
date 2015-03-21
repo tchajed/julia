@@ -1810,6 +1810,11 @@ DLLEXPORT jl_value_t *jl_apply_tuple_type(jl_svec_t *params, int va)
     return ndt;
 }
 
+jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np)
+{
+    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL);
+}
+
 static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **iparams, size_t ntp,
                                  int cacheable, int isabstract, jl_typestack_t *stack)
 {

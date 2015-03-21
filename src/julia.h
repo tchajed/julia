@@ -350,7 +350,6 @@ extern DLLEXPORT jl_datatype_t *jl_datatype_type;
 extern DLLEXPORT jl_value_t *jl_bottom_type;
 extern DLLEXPORT jl_datatype_t *jl_lambda_info_type;
 extern DLLEXPORT jl_datatype_t *jl_module_type;
-//extern DLLEXPORT jl_datatype_t *jl_vararg_type;
 extern DLLEXPORT jl_datatype_t *jl_function_type;
 extern DLLEXPORT jl_datatype_t *jl_abstractarray_type;
 extern DLLEXPORT jl_datatype_t *jl_densearray_type;
@@ -584,6 +583,7 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 // basic predicates -----------------------------------------------------------
 #define jl_is_nothing(v)     (((jl_value_t*)(v)) == ((jl_value_t*)jl_nothing))
 #define jl_is_tuple(v)       (((jl_datatype_t*)jl_typeof(v))->name == jl_tuple_typename)
+#define jl_is_svec(v)        jl_typeis(v,jl_simplevector_type)
 #define jl_is_datatype(v)    jl_typeis(v,jl_datatype_type)
 #define jl_is_pointerfree(t) (((jl_datatype_t*)t)->pointerfree)
 #define jl_is_mutable(t)     (((jl_datatype_t*)t)->mutabl)

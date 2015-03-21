@@ -40,7 +40,7 @@ uint32_t jl_get_gs_ctr(void);
 void jl_set_gs_ctr(uint32_t ctr);
 
 void NORETURN jl_no_method_error(jl_function_t *f, jl_value_t **args, size_t na);
-void jl_check_type_tuple(jl_tuple_t *t, jl_sym_t *name, const char *ctx);
+void jl_check_type_tuple(jl_value_t *t, jl_sym_t *name, const char *ctx);
 
 #define JL_CALLABLE(name) \
     DLLEXPORT jl_value_t *name(jl_value_t *F, jl_value_t **args, uint32_t nargs)
@@ -79,6 +79,7 @@ int jl_subtype_invariant(jl_value_t *a, jl_value_t *b, int ta);
 jl_value_t *jl_type_match(jl_value_t *a, jl_value_t *b);
 jl_value_t *jl_type_match_morespecific(jl_value_t *a, jl_value_t *b);
 int jl_types_equal_generic(jl_value_t *a, jl_value_t *b, int useenv);
+jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np);
 
 void jl_set_datatype_super(jl_datatype_t *tt, jl_value_t *super);
 void jl_initialize_generic_function(jl_function_t *f, jl_sym_t *name);
