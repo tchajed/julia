@@ -686,11 +686,11 @@ static void record_backtrace(void)
 static jl_value_t *array_ptr_void_type = NULL;
 DLLEXPORT jl_value_t *jl_backtrace_from_here(void)
 {
-    jl_tuple_t *tp = NULL;
+    jl_svec_t *tp = NULL;
     jl_array_t *bt = NULL;
     JL_GC_PUSH2(&tp, &bt);
     if (array_ptr_void_type == NULL) {
-        tp = jl_tuple2(jl_voidpointer_type, jl_box_long(1));
+        tp = jl_svec2(jl_voidpointer_type, jl_box_long(1));
         array_ptr_void_type = jl_apply_type((jl_value_t*)jl_array_type, tp);
     }
     bt = jl_alloc_array_1d(array_ptr_void_type, MAX_BT_SIZE);
@@ -708,13 +708,13 @@ DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
     const char *file_name;
     int fromC = frame_info_from_ip(&func_name, &line_num, &file_name, (size_t)ip, skipC);
     if (func_name != NULL) {
-        jl_value_t *r = (jl_value_t*)jl_alloc_tuple(5);
+        jl_value_t *r = (jl_value_t*)jl_alloc_svec(5);
         JL_GC_PUSH1(&r);
-        jl_tupleset(r, 0, jl_symbol(func_name));
-        jl_tupleset(r, 1, jl_symbol(file_name));
-        jl_tupleset(r, 2, jl_box_long(line_num));
-        jl_tupleset(r, 3, jl_box_bool(fromC));
-        jl_tupleset(r, 4, jl_box_long((intptr_t)ip));
+        jl_svecset(r, 0, jl_symbol(func_name));
+        jl_svecset(r, 1, jl_symbol(file_name));
+        jl_svecset(r, 2, jl_box_long(line_num));
+        jl_svecset(r, 3, jl_box_bool(fromC));
+        jl_svecset(r, 4, jl_box_long((intptr_t)ip));
         JL_GC_POP();
         return r;
     }
@@ -723,11 +723,11 @@ DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
 
 DLLEXPORT jl_value_t *jl_get_backtrace(void)
 {
-    jl_tuple_t *tp = NULL;
+    jl_svec_t *tp = NULL;
     jl_array_t *bt = NULL;
     JL_GC_PUSH2(&tp, &bt);
     if (array_ptr_void_type == NULL) {
-        tp = jl_tuple2(jl_voidpointer_type, jl_box_long(1));
+        tp = jl_svec2(jl_voidpointer_type, jl_box_long(1));
         array_ptr_void_type = jl_apply_type((jl_value_t*)jl_array_type, tp);
     }
     bt = jl_alloc_array_1d(array_ptr_void_type, bt_size);
@@ -882,7 +882,7 @@ JL_CALLABLE(jl_f_yieldto)
         jl_task_arg_in_transit = jl_f_tuple(NULL, &args[1], nargs-1);
     }
     else {
-        jl_task_arg_in_transit = (jl_value_t*)jl_null;
+        jl_task_arg_in_transit = jl_emptytuple;
     }
     return switchto((jl_task_t*)args[0]);
 }
@@ -900,7 +900,7 @@ void jl_init_tasks(void *stack, size_t ssize)
     jl_task_type = jl_new_datatype(jl_symbol("Task"),
                                    jl_any_type,
                                    jl_null,
-                                   jl_tuple(9,
+                                   jl_svec(9,
                                             jl_symbol("parent"),
                                             jl_symbol("last"),
                                             jl_symbol("storage"),
@@ -910,13 +910,13 @@ void jl_init_tasks(void *stack, size_t ssize)
                                             jl_symbol("result"),
                                             jl_symbol("exception"),
                                             jl_symbol("code")),
-                                   jl_tuple(9,
+                                   jl_svec(9,
                                             jl_any_type, jl_any_type,
                                             jl_any_type, jl_sym_type,
                                             jl_any_type, jl_any_type,
                                             jl_any_type, jl_any_type, jl_function_type),
                                    0, 1, 0);
-    jl_tupleset(jl_task_type->types, 0, (jl_value_t*)jl_task_type);
+    jl_svecset(jl_task_type->types, 0, (jl_value_t*)jl_task_type);
 
     done_sym = jl_symbol("done");
     failed_sym = jl_symbol("failed");

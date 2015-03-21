@@ -201,7 +201,7 @@ static Constant *julia_const_to_llvm(jl_value_t *e)
         }
     }
     if (jl_isbits(jt)) {
-        size_t nf = jl_tuple_len(bt->names), i;
+        size_t nf = jl_datatype_nfields(bt), i;
         size_t llvm_nf = 0;
         Constant **fields = (Constant**)alloca(nf * sizeof(Constant*));
         jl_value_t *f=NULL;
@@ -250,7 +250,7 @@ static Type *jl_llvmtuple_eltype(Type *tuple, jl_value_t *jt, size_t i)
     else if (tuple == T_void)
         ety = T_void;
     else if (tuple->isStructTy())
-        ety = julia_type_to_llvm(jl_svecref((jl_svec_t*)jt,i));
+        ety = julia_type_to_llvm(jl_field_type(jt,i));
     else
         assert(false);
     return ety;
@@ -286,22 +286,6 @@ static Value *emit_unbox(Type *to, Value *x, jl_value_t *jt)
             return UndefValue::get(to);
         }
         return x;
-    }
-    if ( (jt != NULL && jl_is_tuple(jt)) || to->isVectorTy() || to->isArrayTy() ||
-         (to->isStructTy() && dyn_cast<StructType>(to)->isLiteral()) ) {
-        assert(jt != 0);
-        assert(jl_is_tuple(jt));
-        assert(to != T_void);
-        Value *tpl = UndefValue::get(to);
-        for (size_t i = 0; i < jl_tuple_len(jt); ++i) {
-            Type *ety = jl_llvmtuple_eltype(to,jt,i);
-            if (ety == T_void)
-                continue;
-            Value *ref = emit_tupleref(x,ConstantInt::get(T_size,i),jt,NULL);
-            Value *elt = emit_unbox(ety,ref,jl_svecref(jt,i));
-            tpl = emit_tupleset(tpl,ConstantInt::get(T_size,i),elt,jt,NULL);
-        }
-        return tpl;
     }
     Value *p = data_pointer(x);
     if (to == T_int1) {
@@ -388,8 +372,8 @@ static Value *generic_unbox(jl_value_t *targ, jl_value_t *x, jl_codectx_t *ctx)
         jl_value_t *bt=NULL;
         JL_TRY {
             bt = jl_interpret_toplevel_expr_in(ctx->module, targ,
-                                               jl_tuple_data(ctx->sp),
-                                               jl_tuple_len(ctx->sp)/2);
+                                               jl_svec_data(ctx->sp),
+                                               jl_svec_len(ctx->sp)/2);
         }
         JL_CATCH {
         }
@@ -418,8 +402,8 @@ static Value *generic_box(jl_value_t *targ, jl_value_t *x, jl_codectx_t *ctx)
     else {
         JL_TRY {
             bt = jl_interpret_toplevel_expr_in(ctx->module, targ,
-                                               jl_tuple_data(ctx->sp),
-                                               jl_tuple_len(ctx->sp)/2);
+                                               jl_svec_data(ctx->sp),
+                                               jl_svec_len(ctx->sp)/2);
         }
         JL_CATCH {
         }
@@ -501,8 +485,8 @@ static Type *staticeval_bitstype(jl_value_t *targ, const char *fname, jl_codectx
 {
     jl_value_t *bt =
         jl_interpret_toplevel_expr_in(ctx->module, targ,
-                                      jl_tuple_data(ctx->sp),
-                                      jl_tuple_len(ctx->sp)/2);
+                                      jl_svec_data(ctx->sp),
+                                      jl_svec_len(ctx->sp)/2);
     if (!jl_is_bitstype(bt))
         jl_errorf("%s: expected bits type as first argument", fname);
     Type *to = julia_type_to_llvm(bt);

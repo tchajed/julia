@@ -373,7 +373,7 @@ jl_value_t *jl_apply_array_type(jl_datatype_t *type, size_t dim)
 {
     jl_value_t *boxed_dim = jl_box_long(dim);
     JL_GC_PUSH1(&boxed_dim);
-    jl_value_t *ret = jl_apply_type((jl_value_t*)jl_array_type, jl_tuple2(type, boxed_dim));
+    jl_value_t *ret = jl_apply_type((jl_value_t*)jl_array_type, jl_svec2(type, boxed_dim));
     JL_GC_POP();
     return ret;
 }
@@ -414,13 +414,8 @@ JL_CALLABLE(jl_f_arraysize)
             return jl_box_long(1);
         return jl_box_long((&a->nrows)[dno-1]);
     }
-    jl_tuple_t *d = jl_alloc_tuple(nd);
-    JL_GC_PUSH1(&d);
-    size_t i;
-    for(i=0; i < nd; i++)
-        jl_tupleset(d, i, jl_box_long(jl_array_dim(a,i)));
-    JL_GC_POP();
-    return (jl_value_t*)d;
+    assert(0 && "DO THIS AT THE JULIA LEVEL");
+    return jl_nothing;
 }
 
 jl_value_t *jl_arrayref(jl_array_t *a, size_t i)
