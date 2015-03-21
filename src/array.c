@@ -147,7 +147,7 @@ jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data, jl_tuple_t *di
 {
     size_t i;
     jl_array_t *a;
-    size_t ndims = jl_tuple_len(dims);
+    size_t ndims = jl_svec_len(dims);
 
     int ndimwords = jl_array_ndimwords(ndims);
     int tsz = JL_ARRAY_ALIGN(sizeof(jl_array_t) + ndimwords*sizeof(size_t) + sizeof(void*), 16);
@@ -176,7 +176,7 @@ jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data, jl_tuple_t *di
     data->isshared = 1;
 
     if (ndims == 1) {
-        size_t l = jl_unbox_long(jl_tupleref(dims,0));
+        size_t l = jl_unbox_long(jl_fieldref(dims,0));
 #ifdef STORE_ARRAY_LEN
         a->length = l;
 #endif
@@ -188,7 +188,7 @@ jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data, jl_tuple_t *di
         size_t l=1;
         wideint_t prod;
         for(i=0; i < ndims; i++) {
-            adims[i] = jl_unbox_long(jl_tupleref(dims, i));
+            adims[i] = jl_unbox_long(jl_fieldref(dims, i));
             prod = (wideint_t)l * (wideint_t)adims[i];
             if (prod > (wideint_t) MAXINTVAL)
                 jl_error("invalid Array dimensions");
@@ -251,11 +251,11 @@ jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_tuple_t *dims,
 {
     size_t i, elsz, nel=1;
     jl_array_t *a;
-    size_t ndims = jl_tuple_len(dims);
+    size_t ndims = jl_nfields(dims);
     wideint_t prod;
 
     for(i=0; i < ndims; i++) {
-        prod = (wideint_t)nel * (wideint_t)jl_unbox_long(jl_tupleref(dims, i));
+        prod = (wideint_t)nel * (wideint_t)jl_unbox_long(jl_fieldref(dims, i));
         if (prod > (wideint_t) MAXINTVAL)
             jl_error("invalid Array dimensions");
         nel = prod;
@@ -299,7 +299,7 @@ jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_tuple_t *dims,
     else {
         size_t *adims = &a->nrows;
         for(i=0; i < ndims; i++) {
-            adims[i] = jl_unbox_long(jl_tupleref(dims, i));
+            adims[i] = jl_unbox_long(jl_fieldref(dims, i));
         }
     }
     return a;
@@ -307,11 +307,11 @@ jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_tuple_t *dims,
 
 jl_array_t *jl_new_array(jl_value_t *atype, jl_tuple_t *dims)
 {
-    size_t ndims = jl_tuple_len(dims);
+    size_t ndims = jl_nfields(dims);
     size_t *adims = (size_t*)alloca(ndims*sizeof(size_t));
     size_t i;
     for(i=0; i < ndims; i++)
-        adims[i] = jl_unbox_long(jl_tupleref(dims,i));
+        adims[i] = jl_unbox_long(jl_fieldref(dims,i));
     return _new_array(atype, ndims, adims);
 }
 

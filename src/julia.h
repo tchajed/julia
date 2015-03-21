@@ -576,6 +576,7 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 // struct type info
 #define jl_field_offset(st,i)  (((jl_datatype_t*)st)->fields[i].offset)
 #define jl_field_size(st,i)    (((jl_datatype_t*)st)->fields[i].size)
+#define jl_field_isptr(st,i)   (((jl_datatype_t*)st)->fields[i].isptr)
 #define jl_field_type(st,i)    jl_svecref(((jl_datatype_t*)st)->types, (i))
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
 #define jl_datatype_nfields(t) jl_svec_len(((jl_datatype_t*)(t))->types)
