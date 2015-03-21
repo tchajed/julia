@@ -36,18 +36,18 @@ static jl_methtable_t *new_method_table(jl_sym_t *name)
     return mt;
 }
 
-static int cache_match_by_type(jl_value_t **types, size_t n, jl_tuple_t *sig, int va)
+static int cache_match_by_type(jl_value_t **types, size_t n, jl_tupletype_t *sig, int va)
 {
-    if (!va && n > jl_tuple_len(sig))
+    if (!va && n > jl_datatype_nfields(sig))
         return 0;
-    if (jl_tuple_len(sig) > n) {
-        if (!(n == jl_tuple_len(sig)-1 && va))
+    if (jl_datatype_nfields(sig) > n) {
+        if (!(n == jl_datatype_nfields(sig)-1 && va))
             return 0;
     }
     size_t i;
     for(i=0; i < n; i++) {
-        jl_value_t *decl = jl_tupleref(sig, i);
-        if (i == jl_tuple_len(sig)-1) {
+        jl_value_t *decl = jl_field_type(sig, i);
+        if (i == jl_datatype_nfields(sig)-1) {
             if (va) {
                 jl_value_t *t = jl_tparam0(decl);
                 for(; i < n; i++) {
@@ -58,7 +58,7 @@ static int cache_match_by_type(jl_value_t **types, size_t n, jl_tuple_t *sig, in
             }
         }
         jl_value_t *a = types[i];
-        if (jl_is_tuple(decl)) {
+        if (jl_is_tupletype(decl)) {
             // tuples don't have to match exactly, to avoid caching
             // signatures for tuples of every length
             if (!jl_subtype(a, decl, 0))
@@ -88,12 +88,12 @@ static int cache_match_by_type(jl_value_t **types, size_t n, jl_tuple_t *sig, in
     return 1;
 }
 
-static inline int cache_match(jl_value_t **args, size_t n, jl_tuple_t *sig,
+static inline int cache_match(jl_value_t **args, size_t n, jl_tupletype_t *sig,
                               int va, size_t lensig)
 {
     // NOTE: This function is a huge performance hot spot!!
     for(size_t i=0; i < n; i++) {
-        jl_value_t *decl = jl_tupleref(sig, i);
+        jl_value_t *decl = jl_field_type(sig, i);
         if (i == lensig-1) {
             if (va) {
                 jl_value_t *t = jl_tparam0(decl);
@@ -113,7 +113,7 @@ static inline int cache_match(jl_value_t **args, size_t n, jl_tuple_t *sig,
               hash-consed, so pointer comparison should work.
             */
         }
-        else if (jl_is_tuple(decl)) {
+        else if (jl_is_tupletype(decl)) {
             // tuples don't have to match exactly, to avoid caching
             // signatures for tuples of every length
             if (!jl_is_tuple(a) || //!jl_subtype(a, decl, 1))
