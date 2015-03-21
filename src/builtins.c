@@ -1078,8 +1078,7 @@ JL_CALLABLE(jl_f_invoke)
         jl_error("invoke: not a generic function");
     JL_TYPECHK(invoke, tuple, args[1]);
     jl_check_type_tuple((jl_tuple_t*)args[1], jl_gf_name(args[0]), "invoke");
-    if (!jl_tuple_subtype(&args[2], nargs-2, jl_tuple_data(args[1]),
-                          jl_tuple_len(args[1]), 1))
+    if (!jl_tuple_subtype(&args[2], nargs-2, 0, (jl_datatype_t*)args[1], 1))
         jl_error("invoke: argument type error");
     return jl_gf_invoke((jl_function_t*)args[0],
                         (jl_tuple_t*)args[1], &args[2], nargs-2);

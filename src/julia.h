@@ -70,11 +70,11 @@ typedef struct {
         uintptr_t type_bits;
         struct {
             uintptr_t gc_bits:2;
-#ifdef OVERLAP_SV_LEN
+#ifdef OVERLAP_SVEC_LEN
 #ifdef _P64
             uintptr_t unmarked:50;
 #else
-#error OVERLAP_SV_LEN requires 64-bit pointers
+#error OVERLAP_SVEC_LEN requires 64-bit pointers
 #endif
             uintptr_t length:12;
 #endif
@@ -105,7 +105,7 @@ typedef struct _jl_gensym_t {
 
 typedef struct {
     JL_DATA_TYPE
-#ifndef OVERLAP_SV_LEN
+#ifndef OVERLAP_SVEC_LEN
     size_t length;
 #endif
     jl_value_t *data[];
@@ -416,7 +416,7 @@ extern DLLEXPORT jl_datatype_t *jl_methtable_type;
 extern DLLEXPORT jl_datatype_t *jl_method_type;
 extern DLLEXPORT jl_datatype_t *jl_task_type;
 
-extern DLLEXPORT jl_svec_t *jl_emptysv;
+extern DLLEXPORT jl_svec_t *jl_emptysvec;
 extern DLLEXPORT jl_value_t *jl_emptytuple;
 DLLEXPORT extern jl_value_t *jl_true;
 DLLEXPORT extern jl_value_t *jl_false;
@@ -492,7 +492,7 @@ static inline void gc_wb_back(void *ptr) // ptr isa jl_value_t*
 
 // object accessors -----------------------------------------------------------
 
-#ifdef OVERLAP_SV_LEN
+#ifdef OVERLAP_SVEC_LEN
 #define jl_typeof(v) ((jl_value_t*)((uptrint_t)((jl_value_t*)(v))->type & 0x000ffffffffffffeULL))
 #else
 #define jl_typeof(v) ((jl_value_t*)((uptrint_t)((jl_value_t*)(v))->type & ((uintptr_t)~3)))
@@ -560,8 +560,10 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 #define jl_globalref_mod(s) ((jl_module_t*)jl_fieldref(s,0))
 #define jl_globalref_name(s) ((jl_sym_t*)jl_fieldref(s,1))
 
-#define jl_tparam0(t) jl_svecref(((jl_datatype_t*)(t))->parameters, 0)
-#define jl_tparam1(t) jl_svecref(((jl_datatype_t*)(t))->parameters, 1)
+#define jl_nparams(t)  jl_svec_len(((jl_datatype_t*)(t))->parameters)
+#define jl_tparam0(t)  jl_svecref(((jl_datatype_t*)(t))->parameters, 0)
+#define jl_tparam1(t)  jl_svecref(((jl_datatype_t*)(t))->parameters, 1)
+#define jl_tparam(t,i) jl_svecref(((jl_datatype_t*)(t))->parameters, i)
 
 #define jl_cell_data(a)   ((jl_value_t**)((jl_array_t*)a)->data)
 #define jl_string_data(s) ((char*)((jl_array_t*)(s)->fieldptr[0])->data)
@@ -574,9 +576,11 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 #define jl_data_ptr(v)  (((jl_value_t*)v)->fieldptr)
 
 // struct type info
-#define jl_field_offset(st,i) (((jl_datatype_t*)st)->fields[i].offset)
-#define jl_field_size(st,i)   (((jl_datatype_t*)st)->fields[i].size)
-#define jl_datatype_size(t)   (((jl_datatype_t*)t)->size)
+#define jl_field_offset(st,i)  (((jl_datatype_t*)st)->fields[i].offset)
+#define jl_field_size(st,i)    (((jl_datatype_t*)st)->fields[i].size)
+#define jl_field_type(st,i)    jl_svecref(((jl_datatype_t*)st)->types, (i))
+#define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
+#define jl_datatype_nfields(t) jl_svec_len(((jl_datatype_t*)(t))->types)
 
 // basic predicates -----------------------------------------------------------
 #define jl_is_nothing(v)     (((jl_value_t*)(v)) == ((jl_value_t*)jl_nothing))
@@ -697,13 +701,6 @@ STATIC_INLINE jl_value_t *jl_is_ref_type(jl_value_t *t)
     return 0;
 }
 
-/*
-STATIC_INLINE int jl_is_vararg_type(jl_value_t *v)
-{
-    return (jl_is_datatype(v) &&
-            ((jl_datatype_t*)(v))->name == jl_vararg_type->name);
-}
-*/
 STATIC_INLINE int jl_is_tuple_type(void *t)
 {
     return (jl_is_datatype(t) &&
@@ -715,14 +712,7 @@ STATIC_INLINE int jl_is_ntuple_type(jl_value_t *v)
     return (jl_is_datatype(v) &&
             ((jl_datatype_t*)v)->name == jl_ntuple_typename);
 }
-/*
-STATIC_INLINE int jl_is_nontuple_type(jl_value_t *v)
-{
-    return (jl_typeis(v, jl_uniontype_type) ||
-            jl_typeis(v, jl_datatype_type) ||
-            jl_typeis(v, jl_typector_type));
-}
-*/
+
 STATIC_INLINE int jl_is_type_type(jl_value_t *v)
 {
     return (jl_is_datatype(v) &&
@@ -734,7 +724,6 @@ DLLEXPORT int jl_egal(jl_value_t *a, jl_value_t *b);
 DLLEXPORT uptrint_t jl_object_id(jl_value_t *v);
 
 // type predicates and basic operations
-//jl_value_t *jl_full_type(jl_value_t *v);
 int jl_is_type(jl_value_t *v);
 DLLEXPORT int jl_is_leaf_type(jl_value_t *v);
 int jl_has_typevars(jl_value_t *v);
@@ -768,7 +757,6 @@ DLLEXPORT jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
 DLLEXPORT jl_datatype_t *jl_new_bitstype(jl_value_t *name, jl_datatype_t *super,
                                          jl_svec_t *parameters, size_t nbits);
 jl_datatype_t *jl_wrap_Type(jl_value_t *t);  // x -> Type{x}
-//jl_datatype_t *jl_wrap_vararg(jl_value_t *t); // x -> x...
 
 // constructors
 DLLEXPORT jl_value_t *jl_new_bits(jl_value_t *bt, void *data);
@@ -780,11 +768,10 @@ DLLEXPORT jl_function_t *jl_new_closure(jl_fptr_t proc, jl_value_t *env,
                                         jl_lambda_info_t *li);
 DLLEXPORT jl_lambda_info_t *jl_new_lambda_info(jl_value_t *ast, jl_svec_t *sparams);
 DLLEXPORT jl_svec_t *jl_svec(size_t n, ...);
-//DLLEXPORT jl_tuple_t *jl_tuplev(size_t n, jl_value_t **v);
 DLLEXPORT jl_svec_t *jl_svec1(void *a);
 DLLEXPORT jl_svec_t *jl_svec2(void *a, void *b);
-DLLEXPORT jl_svec_t *jl_alloc_sv(size_t n);
-DLLEXPORT jl_svec_t *jl_alloc_sv_uninit(size_t n);
+DLLEXPORT jl_svec_t *jl_alloc_svec(size_t n);
+DLLEXPORT jl_svec_t *jl_alloc_svec_uninit(size_t n);
 DLLEXPORT jl_svec_t *jl_svec_append(jl_svec_t *a, jl_svec_t *b);
 DLLEXPORT jl_svec_t *jl_svec_fill(size_t n, jl_value_t *x);
 DLLEXPORT jl_value_t *jl_tupletype_fill(size_t n, jl_value_t *v);

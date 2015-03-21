@@ -1016,10 +1016,10 @@ DLLEXPORT jl_function_t *jl_instantiate_staged(jl_methlist_t *m, jl_tuple_t *tt,
     return func;
 }
 
-static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_tuple_t *tt, int cache, int inexact)
+static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_datatype_t *tt, int cache, int inexact)
 {
     jl_methlist_t *m = mt->defs;
-    size_t nargs = jl_tuple_len(tt);
+    size_t nargs = jl_nparams(tt);
     size_t i;
     jl_value_t *ti=(jl_value_t*)jl_bottom_type;
     jl_tuple_t *newsig=NULL, *env = jl_null;
@@ -1050,9 +1050,8 @@ static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_tuple_t *tt, in
                 ti = (jl_value_t*)jl_bottom_type;
             }
         }
-        else if (jl_tuple_subtype(jl_tuple_data(tt), nargs,
-                                  jl_tuple_data(m->sig),
-                                  jl_tuple_len(m->sig), 0)) {
+        else if (jl_tuple_subtype(jl_svec_data(tt->parameters), nargs, tt->va,
+                                  m->sig, 0)) {
             break;
         }
         m = m->next;
@@ -1708,12 +1707,12 @@ JL_CALLABLE(jl_apply_generic)
     return res;
 }
 
-DLLEXPORT jl_value_t *jl_gf_invoke_lookup(jl_function_t *gf, jl_tuple_t *types)
+DLLEXPORT jl_value_t *jl_gf_invoke_lookup(jl_function_t *gf, jl_datatype_t *types)
 {
     assert(jl_is_gf(gf));
     jl_methtable_t *mt = jl_gf_mtable(gf);
     jl_methlist_t *m = mt->defs;
-    size_t typelen = jl_tuple_len(types);
+    size_t typelen = jl_nparams(types);
     jl_value_t *env = (jl_value_t*)jl_false;
 
     while (m != JL_NULL) {
@@ -1721,9 +1720,8 @@ DLLEXPORT jl_value_t *jl_gf_invoke_lookup(jl_function_t *gf, jl_tuple_t *types)
             env = jl_type_match((jl_value_t*)types, (jl_value_t*)m->sig);
             if (env != (jl_value_t*)jl_false) break;
         }
-        else if (jl_tuple_subtype(jl_tuple_data(types), typelen,
-                                  jl_tuple_data(m->sig),
-                                  jl_tuple_len(m->sig), 0)) {
+        else if (jl_tuple_subtype(jl_svec_data(types->parameters), typelen, types->va,
+                                  m->sig, 0)) {
             break;
         }
         m = m->next;

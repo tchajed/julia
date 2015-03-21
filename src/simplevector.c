@@ -8,9 +8,9 @@
 DLLEXPORT jl_svec_t *jl_svec(size_t n, ...)
 {
     va_list args;
-    if (n == 0) return jl_emptysv;
+    if (n == 0) return jl_emptysvec;
     va_start(args, n);
-    jl_tuple_t *jv = jl_alloc_sv_uninit(n);
+    jl_tuple_t *jv = jl_alloc_svec_uninit(n);
     for(size_t i=0; i < n; i++) {
         jl_svecset(jv, i, va_arg(args, jl_value_t*));
     }
@@ -20,12 +20,12 @@ DLLEXPORT jl_svec_t *jl_svec(size_t n, ...)
 
 jl_svec_t *jl_svec1(void *a)
 {
-#ifdef OVERLAP_SV_LEN
+#ifdef OVERLAP_SVEC_LEN
     jl_svec_t *v = (jl_svec_t*)alloc_2w();
 #else
     jl_svec_t *v = (jl_svec_t*)alloc_3w();
 #endif
-    v->type = (jl_value_t*)jl_simplevector_type;
+    jl_set_typeof(v, jl_simplevector_type);
     jl_svec_set_len_unsafe(v, 1);
     jl_svecset(v, 0, a);
     return v;
@@ -33,21 +33,21 @@ jl_svec_t *jl_svec1(void *a)
 
 jl_svec_t *jl_svec2(void *a, void *b)
 {
-#ifdef OVERLAP_TUPLE_LEN
+#ifdef OVERLAP_SVEC_LEN
     jl_svec_t *v = (jl_svec_t*)alloc_3w();
 #else
     jl_svec_t *v = (jl_svec_t*)alloc_4w();
 #endif
-    v->type = (jl_value_t*)jl_simplevector_type;
+    jl_set_typeof(v, jl_simplevector_type);
     jl_svec_set_len_unsafe(v, 2);
     jl_svecset(v, 0, a);
     jl_svecset(v, 1, b);
     return v;
 }
 
-jl_svec_t *jl_alloc_sv_uninit(size_t n)
+jl_svec_t *jl_alloc_svec_uninit(size_t n)
 {
-    if (n == 0) return jl_emptysv;
+    if (n == 0) return jl_emptysvec;
 #ifdef OVERLAP_TUPLE_LEN
     jl_svec_t *jv = (jl_tuple_t*)newobj((jl_value_t*)jl_simplevector_type, n);
 #else
@@ -57,10 +57,10 @@ jl_svec_t *jl_alloc_sv_uninit(size_t n)
     return jv;
 }
 
-jl_tuple_t *jl_alloc_sv(size_t n)
+jl_tuple_t *jl_alloc_svec(size_t n)
 {
-    if (n == 0) return jl_emptysv;
-    jl_svec_t *jv = jl_alloc_sv_uninit(n);
+    if (n == 0) return jl_emptysvec;
+    jl_svec_t *jv = jl_alloc_svec_uninit(n);
     for(size_t i=0; i < n; i++) {
         jl_svecset(jv, i, NULL);
     }
@@ -69,7 +69,7 @@ jl_tuple_t *jl_alloc_sv(size_t n)
 
 jl_svec_t *jl_svec_append(jl_svec_t *a, jl_svec_t *b)
 {
-    jl_svec_t *c = jl_alloc_sv_uninit(jl_svec_len(a) + jl_svec_len(b));
+    jl_svec_t *c = jl_alloc_svec_uninit(jl_svec_len(a) + jl_svec_len(b));
     size_t i=0, j;
     for(j=0; j < jl_svec_len(a); j++) {
         jl_svecset(c, i, jl_svecref(a,j));
@@ -84,8 +84,8 @@ jl_svec_t *jl_svec_append(jl_svec_t *a, jl_svec_t *b)
 
 jl_svec_t *jl_svec_fill(size_t n, jl_value_t *x)
 {
-    if (n==0) return jl_emptysv;
-    jl_svec_t *v = jl_alloc_sv_uninit(n);
+    if (n==0) return jl_emptysvec;
+    jl_svec_t *v = jl_alloc_svec_uninit(n);
     for(size_t i=0; i < n; i++) {
         jl_svecset(v, i, x);
     }
