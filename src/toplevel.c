@@ -631,9 +631,9 @@ extern int jl_boot_file_loaded;
 static int svec_contains(jl_svet_t *svec, jl_value_t *x)
 {
     assert(jl_is_svec(svec));
-    size_t i, l=jl_tuple_len(ty);
+    size_t i, l=jl_svec_len(svec);
     for(i=0; i < l; i++) {
-        jl_value_t *e = jl_tupleref(ty,i);
+        jl_value_t *e = jl_svecref(svec, i);
         if (e==x || type_contains(e, x))
             return 1;
     }
@@ -646,7 +646,7 @@ static int type_contains(jl_value_t *ty, jl_value_t *x)
     if (jl_is_uniontype(ty))
         return type_contains(jl_fieldref(ty,0), x);
     if (jl_is_datatype(ty))
-        return type_contains((jl_value_t*)((jl_datatype_t*)ty)->parameters, x);
+        return svec_contains((jl_value_t*)((jl_datatype_t*)ty)->parameters, x);
     return 0;
 }
 
