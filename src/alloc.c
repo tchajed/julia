@@ -582,8 +582,8 @@ void jl_compute_field_offsets(jl_datatype_t *st)
 extern int jl_boot_file_loaded;
 
 jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
-                               jl_tuple_t *parameters,
-                               jl_tuple_t *fnames, jl_tuple_t *ftypes,
+                               jl_svec_t *parameters,
+                               jl_svec_t *fnames, jl_svec_t *ftypes,
                                int abstract, int mutabl, int ninitialized)
 {
     jl_datatype_t *t=NULL;
@@ -601,7 +601,7 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
             t = jl_bool_type;
     }
     if (t == NULL)
-        t = jl_new_uninitialized_datatype(jl_tuple_len(fnames));
+        t = jl_new_uninitialized_datatype(jl_svec_len(fnames));
     else
         tn = t->name;
     // init before possibly calling jl_new_typename
@@ -638,7 +638,7 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
         gc_wb(t->name, t);
     }
 
-    if (abstract || jl_tuple_len(parameters) > 0) {
+    if (abstract || jl_svec_len(parameters) > 0) {
         t->uid = 0;
     }
     else {
@@ -651,7 +651,7 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
 }
 
 jl_datatype_t *jl_new_bitstype(jl_value_t *name, jl_datatype_t *super,
-                               jl_tuple_t *parameters, size_t nbits)
+                               jl_svec_t *parameters, size_t nbits)
 {
     jl_datatype_t *bt = jl_new_datatype((jl_sym_t*)name, super, parameters,
                                         jl_null, jl_null, 0, 0, 0);
@@ -663,18 +663,18 @@ jl_datatype_t *jl_new_bitstype(jl_value_t *name, jl_datatype_t *super,
     return bt;
 }
 
-jl_uniontype_t *jl_new_uniontype(jl_tuple_t *types)
+jl_uniontype_t *jl_new_uniontype(jl_svec_t *types)
 {
     jl_uniontype_t *t = (jl_uniontype_t*)newobj((jl_value_t*)jl_uniontype_type,NWORDS(sizeof(jl_uniontype_t)));
     // don't make unions of 1 type; Union(T)==T
-    assert(jl_tuple_len(types) != 1);
+    assert(jl_svec_len(types) != 1);
     t->types = types;
     return t;
 }
 
 // type constructor -----------------------------------------------------------
 
-jl_typector_t *jl_new_type_ctor(jl_tuple_t *params, jl_value_t *body)
+jl_typector_t *jl_new_type_ctor(jl_svec_t *params, jl_value_t *body)
 {
     jl_typector_t *tc = (jl_typector_t*)newobj((jl_value_t*)jl_typector_type,NWORDS(sizeof(jl_typector_t)));
     tc->parameters = params;

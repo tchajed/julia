@@ -1763,7 +1763,6 @@ static void pre_mark(void)
     gc_push_root(jl_unprotect_stack_func, 0);
     gc_push_root(jl_bottom_func, 0);
     gc_push_root(jl_typetype_type, 0);
-    gc_push_root(jl_tupletype_type, 0);
 
     // constants
     gc_push_root(jl_null, 0);
