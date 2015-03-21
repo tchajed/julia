@@ -674,7 +674,7 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
                 // DataType: define `call`, for backwards compat with outer constructors
                 if (call_func == NULL)
                     call_func = (jl_value_t*)jl_module_call_func(jl_current_module);
-                size_t na = jl_tuple_len(argtypes);
+                size_t na = jl_svec_len(argtypes);
                 jl_tuple_t *newargtypes = jl_alloc_svec(1 + na);
                 JL_GC_PUSH1(&newargtypes);
                 size_t i=0;
