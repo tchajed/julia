@@ -501,14 +501,14 @@ jl_typename_t *jl_new_typename(jl_sym_t *name)
     tn->name = name;
     tn->module = jl_current_module;
     tn->primary = NULL;
-    tn->cache = (jl_value_t*)jl_null;
+    tn->cache = jl_emptysvec;
     return tn;
 }
 
 jl_datatype_t *jl_new_abstracttype(jl_value_t *name, jl_datatype_t *super,
                                    jl_svec_t *parameters)
 {
-    jl_datatype_t *dt = jl_new_datatype((jl_sym_t*)name, super, parameters, jl_null, jl_null, 1, 0, 0);
+    jl_datatype_t *dt = jl_new_datatype((jl_sym_t*)name, super, parameters, jl_emptysvec, jl_emptysvec, 1, 0, 0);
     dt->pointerfree = 0;
     return dt;
 }
@@ -630,7 +630,7 @@ jl_datatype_t *jl_new_bitstype(jl_value_t *name, jl_datatype_t *super,
                                jl_svec_t *parameters, size_t nbits)
 {
     jl_datatype_t *bt = jl_new_datatype((jl_sym_t*)name, super, parameters,
-                                        jl_null, jl_null, 0, 0, 0);
+                                        jl_emptysvec, jl_emptysvec, 0, 0, 0);
     bt->size = nbits/8;
     bt->alignment = bt->size;
     if (bt->alignment > MAX_ALIGN)

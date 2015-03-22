@@ -381,7 +381,7 @@ static void jl_serialize_datatype(ios_t *s, jl_datatype_t *dt)
         else if (dt->uid == 0) {
             tag = 0; // normal struct
         }
-        else if (jl_is_null(dt->parameters)) {
+        else if (jl_svec_len(dt->parameters) == 0) {
             tag = 7; // external type that can be immediately recreated (with apply_type)
         }
         else { // anything else (external)
@@ -661,7 +661,7 @@ static void jl_serialize_value_(ios_t *s, jl_value_t *v)
         // don't save cached type info for code in the Core module, because
         // it might reference types in the old Base module.
         if (li->module == jl_core_module) {
-            jl_serialize_value(s, (jl_value_t*)jl_null);
+            jl_serialize_value(s, jl_nothing);
         }
         else {
             jl_array_t *tf = (jl_array_t*)li->tfunc;
@@ -1807,7 +1807,7 @@ void jl_init_serializer(void)
                      jl_module_type, jl_tvar_type, jl_lambda_info_type,
                      (void*)CommonSym_tag,
 
-                     jl_null, jl_false, jl_true, jl_nothing, jl_any_type,
+                     jl_emptysvec, jl_emptytuple, jl_false, jl_true, jl_nothing, jl_any_type,
                      call_sym, goto_ifnot_sym, return_sym, body_sym, line_sym,
                      lambda_sym, tuple_sym, assign_sym,
 
@@ -2043,7 +2043,7 @@ void jl_init_serializer(void)
         i += 1;
     }
     assert(i <= Null_tag);
-    VALUE_TAGS = (ptrint_t)ptrhash_get(&ser_tag, jl_null);
+    VALUE_TAGS = (ptrint_t)ptrhash_get(&ser_tag, jl_emptysvec);
 
     i=2;
     while (id_to_fptrs[i] != NULL) {

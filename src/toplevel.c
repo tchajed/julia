@@ -77,7 +77,7 @@ void jl_module_load_time_initialize(jl_module_t *m)
             jl_module_init_order = jl_alloc_cell_1d(0);
         jl_cell_1d_push(jl_module_init_order, (jl_value_t*)m);
         jl_function_t *f = jl_module_get_initializer(m);
-        if (f) jl_get_specialization(f, jl_null);
+        if (f) jl_get_specialization(f, jl_emptytuple->type);
     }
     else {
         jl_module_run_initializer(m);
@@ -508,7 +508,7 @@ jl_value_t *jl_toplevel_eval_flex(jl_value_t *e, int fast)
     }
 
     if (ewc) {
-        thunk = (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_null, thk);
+        thunk = (jl_value_t*)jl_new_closure(NULL, jl_emptysvec, thk);
         if (!jl_in_inference) {
             jl_type_infer(thk, jl_tuple_type, thk);
         }
@@ -619,7 +619,7 @@ void jl_set_datatype_super(jl_datatype_t *tt, jl_value_t *super)
     tt->super = (jl_datatype_t*)super;
     gc_wb(tt, tt->super);
     if (jl_svec_len(tt->parameters) > 0) {
-        tt->name->cache = (jl_value_t*)jl_null;
+        tt->name->cache = jl_emptysvec;
         jl_reinstantiate_inner_types(tt);
     }
 }

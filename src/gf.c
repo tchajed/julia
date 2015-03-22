@@ -401,7 +401,7 @@ void jl_type_infer(jl_lambda_info_t *li, jl_tupletype_t *argtypes, jl_lambda_inf
         jl_value_t *fargs[4];
         fargs[0] = (jl_value_t*)li;
         fargs[1] = (jl_value_t*)argtypes;
-        fargs[2] = (jl_value_t*)jl_null;
+        fargs[2] = (jl_value_t*)jl_emptysvec;
         fargs[3] = (jl_value_t*)def;
 #ifdef TRACE_INFERENCE
         jl_printf(JL_STDERR,"inference on %s", li->name->name);
@@ -801,7 +801,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
 
     // here we infer types and specialize the method
     /*
-    if (sparams==jl_null)
+    if (sparams==jl_emptysvec)
         newmeth = method;
     else
     */

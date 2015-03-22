@@ -432,7 +432,7 @@ static Value *literal_pointer_val(jl_value_t *p)
         return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlfalse_var)));
     if (p == jl_true)
         return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jltrue_var)));
-    if (p == (jl_value_t*)jl_null)
+    if (p == jl_emptysvec)
         return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlemptysvec_var)));
     if (!imaging_mode)
         return literal_static_pointer_val(p, jl_pvalue_llvmt);
@@ -1050,8 +1050,6 @@ static jl_value_t *expr_type(jl_value_t *e, jl_codectx_t *ctx)
 {
     if (jl_is_expr(e))
         return ((jl_expr_t*)e)->etype;
-    if (e == (jl_value_t*)jl_null)
-        return e;
     if (jl_is_symbolnode(e))
         return jl_symbolnode_type(e);
     if (jl_is_gensym(e)) {
@@ -1514,9 +1512,8 @@ static Value *allocate_box_dynamic(Value *jlty, Value *nb, Value *v)
 
 static jl_value_t *static_void_instance(jl_value_t *jt)
 {
-    if (jl_is_type_type(jt) && jl_tparam0(jt) == (jl_value_t*)jl_null) {
-        return (jl_value_t*)jl_null;
-    }
+    if (jt == jl_simplevector_type)
+        return jl_emptysvec;
     if (jl_is_datatype(jt)) {
         jl_datatype_t *jb = (jl_datatype_t*)jt;
         if (jb->instance == NULL)

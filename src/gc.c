@@ -1765,7 +1765,7 @@ static void pre_mark(void)
     gc_push_root(jl_typetype_type, 0);
 
     // constants
-    gc_push_root(jl_null, 0);
+    gc_push_root(jl_emptysvec, 0);
     gc_push_root(jl_true, 0);
     gc_push_root(jl_false, 0);
 }

@@ -275,7 +275,7 @@ static jl_value_t *scm_to_julia_(value_t e, int eo)
         return jl_true;
     }
     if (e == FL_NIL) {
-        return (jl_value_t*)jl_null;
+        assert(0 && "Jeff doesn't think this is supposed to happen");
     }
     if (iscons(e)) {
         value_t hd = car_(e);
@@ -324,7 +324,7 @@ static jl_value_t *scm_to_julia_(value_t e, int eo)
                     e = cdr_(e);
                 }
                 return
-                    (jl_value_t*)jl_new_lambda_info((jl_value_t*)ex, jl_null);
+                    (jl_value_t*)jl_new_lambda_info((jl_value_t*)ex, jl_empty_svec);
             }
 
             e = cdr_(e);
@@ -382,7 +382,7 @@ static jl_value_t *scm_to_julia_(value_t e, int eo)
     }
     jl_error("malformed tree");
 
-    return (jl_value_t*)jl_null;
+    return jl_nothing;
 }
 
 static value_t julia_to_scm_(jl_value_t *v);
@@ -515,7 +515,7 @@ DLLEXPORT jl_value_t *jl_parse_string(const char *str, int pos0, int greedy)
 
     value_t e = car_(p);
     if (e == FL_EOF) {
-        expr = (jl_value_t*)jl_null;
+        expr = jl_nothing;
     }
     else {
         expr = scm_to_julia(e,0);
@@ -646,7 +646,7 @@ jl_lambda_info_t *jl_wrap_expr(jl_value_t *expr)
         expr = (jl_value_t*)bo;
     }
     jl_cellset(le->args, 2, expr);
-    jl_lambda_info_t *li = jl_new_lambda_info((jl_value_t*)le, jl_null);
+    jl_lambda_info_t *li = jl_new_lambda_info((jl_value_t*)le, jl_empty_svec);
     JL_GC_POP();
     return li;
 }
@@ -776,7 +776,7 @@ static jl_value_t *copy_ast(jl_value_t *expr, jl_svec_t *sp, int do_sp)
     else if (jl_is_lambda_info(expr)) {
         jl_lambda_info_t *li = (jl_lambda_info_t*)expr;
         /*
-        if (sp == jl_null && li->ast &&
+        if (sp == jl_empty_svec && li->ast &&
             jl_array_len(jl_lam_capt((jl_expr_t*)li->ast)) == 0)
             return expr;
         */

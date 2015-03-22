@@ -826,7 +826,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
     }
 
     jl_function_t *ff = jl_get_specialization(f, (jl_svec_t*)sigt);
-    if (ff != NULL && ff->env==(jl_value_t*)jl_null && ff->linfo != NULL) {
+    if (ff != NULL && ff->env==jl_emptysvec && ff->linfo != NULL) {
         jl_lambda_info_t *li = ff->linfo;
         if (!jl_types_equal((jl_value_t*)li->specTypes, sigt)) {
             jl_errorf("cfunction: type signature of %s does not match specification",
@@ -1588,7 +1588,7 @@ static Value *emit_lambda_closure(jl_value_t *expr, jl_codectx_t *ctx)
     if (capt == NULL || jl_array_dim0(capt) == 0) {
         // no captured vars; lift
         jl_value_t *fun =
-            (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_null,
+            (jl_value_t*)jl_new_closure(NULL, jl_emptysvec,
                                         (jl_lambda_info_t*)expr);
         jl_add_linfo_root(ctx->linfo, fun);
         return literal_pointer_val(fun);
@@ -4747,7 +4747,7 @@ static void init_julia_llvm_env(Module *m)
 
     jltrue_var = global_to_llvm("jl_true", (void*)&jl_true, m);
     jlfalse_var = global_to_llvm("jl_false", (void*)&jl_false, m);
-    jlemptysvec_var = global_to_llvm("jl_null", (void*)&jl_null, m);
+    jlemptysvec_var = global_to_llvm("jl_emptysvec", (void*)&jl_emptysvec, m);
     jlexc_var = global_to_llvm("jl_exception_in_transit",
                                (void*)&jl_exception_in_transit, m);
     jldiverr_var = global_to_llvm("jl_diverror_exception",

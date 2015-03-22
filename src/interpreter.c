@@ -86,7 +86,7 @@ static int equiv_type(jl_datatype_t *dta, jl_datatype_t *dtb)
 {
     return (jl_typeof(dta) == jl_typeof(dtb) &&
             // TODO: can't yet handle parametric types due to how constructors work
-            dta->parameters == jl_null &&
+            dta->parameters == jl_emptysvec &&
             dta->name->name == dtb->name->name &&
             jl_egal((jl_value_t*)dta->types, (jl_value_t*)dtb->types) &&
             dta->abstract == dtb->abstract &&
@@ -153,7 +153,7 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
                 li->ast = jl_compress_ast(li, li->ast);
                 gc_wb(li, li->ast);
             }
-            return (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_null, li);
+            return (jl_value_t*)jl_new_closure(NULL, jl_emptysvec, li);
         }
         if (jl_is_linenode(e)) {
             jl_lineno = jl_linenode_line(e);
@@ -600,7 +600,7 @@ jl_value_t *jl_interpret_toplevel_thunk_with(jl_lambda_info_t *lam,
     jl_value_t *gensym_types = jl_lam_gensyms(ast);
     size_t ngensym = (jl_is_array(gensym_types) ? jl_array_len(gensym_types) : jl_unbox_gensym(gensym_types));
     JL_GC_PUSHARGS(locals, nl*2+ngensym);
-    jl_value_t *r = (jl_value_t*)jl_null;
+    jl_value_t *r = (jl_value_t*)jl_emptysvec;
     size_t i=0;
     for(i=0; i < llength; i++) {
         locals[i*2]   = names[i];

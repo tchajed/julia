@@ -360,7 +360,7 @@ extern int jl_in_gc;
 static jl_value_t *switchto(jl_task_t *t)
 {
     if (t->state == done_sym || t->state == failed_sym) {
-        jl_task_arg_in_transit = (jl_value_t*)jl_null;
+        jl_task_arg_in_transit = jl_nothing;
         if (t->exception != jl_nothing)
             jl_throw(t->exception);
         return t->result;
@@ -370,7 +370,7 @@ static jl_value_t *switchto(jl_task_t *t)
     }
     ctx_switch(t, &t->ctx);
     jl_value_t *val = jl_task_arg_in_transit;
-    jl_task_arg_in_transit = (jl_value_t*)jl_null;
+    jl_task_arg_in_transit = jl_nothing;
     if (jl_current_task->exception != NULL &&
         jl_current_task->exception != jl_nothing) {
         jl_value_t *exc = jl_current_task->exception;
@@ -718,7 +718,7 @@ DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
         JL_GC_POP();
         return r;
     }
-    return (jl_value_t*)jl_null;
+    return jl_nothing;
 }
 
 DLLEXPORT jl_value_t *jl_get_backtrace(void)
@@ -868,7 +868,7 @@ JL_CALLABLE(jl_unprotect_stack)
     // unprotect stack so it can be reallocated for something else
     mprotect(stk, jl_page_size-1, PROT_READ|PROT_WRITE|PROT_EXEC);
 #endif
-    return (jl_value_t*)jl_null;
+    return jl_nothing;
 }
 
 JL_CALLABLE(jl_f_yieldto)
@@ -899,7 +899,7 @@ void jl_init_tasks(void *stack, size_t ssize)
     _probe_arch();
     jl_task_type = jl_new_datatype(jl_symbol("Task"),
                                    jl_any_type,
-                                   jl_null,
+                                   jl_nothing,
                                    jl_svec(9,
                                             jl_symbol("parent"),
                                             jl_symbol("last"),
@@ -949,9 +949,9 @@ void jl_init_tasks(void *stack, size_t ssize)
 
     jl_root_task = jl_current_task;
 
-    jl_exception_in_transit = (jl_value_t*)jl_null;
-    jl_task_arg_in_transit = (jl_value_t*)jl_null;
-    jl_unprotect_stack_func = jl_new_closure(jl_unprotect_stack, (jl_value_t*)jl_null, NULL);
+    jl_exception_in_transit = (jl_value_t*)jl_nothing;
+    jl_task_arg_in_transit = (jl_value_t*)jl_nothing;
+    jl_unprotect_stack_func = jl_new_closure(jl_unprotect_stack, (jl_value_t*)jl_emptysvec, NULL);
 }
 
 #ifdef __cplusplus
