@@ -899,7 +899,7 @@ void jl_init_tasks(void *stack, size_t ssize)
     _probe_arch();
     jl_task_type = jl_new_datatype(jl_symbol("Task"),
                                    jl_any_type,
-                                   jl_nothing,
+                                   jl_emptysvec,
                                    jl_svec(9,
                                             jl_symbol("parent"),
                                             jl_symbol("last"),

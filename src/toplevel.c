@@ -77,7 +77,7 @@ void jl_module_load_time_initialize(jl_module_t *m)
             jl_module_init_order = jl_alloc_cell_1d(0);
         jl_cell_1d_push(jl_module_init_order, (jl_value_t*)m);
         jl_function_t *f = jl_module_get_initializer(m);
-        if (f) jl_get_specialization(f, jl_emptytuple->type);
+        if (f) jl_get_specialization(f, (jl_tupletype_t*)jl_typeof(jl_emptytuple));
     }
     else {
         jl_module_run_initializer(m);
@@ -508,7 +508,7 @@ jl_value_t *jl_toplevel_eval_flex(jl_value_t *e, int fast)
     }
 
     if (ewc) {
-        thunk = (jl_value_t*)jl_new_closure(NULL, jl_emptysvec, thk);
+        thunk = (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_emptysvec, thk);
         if (!jl_in_inference) {
             jl_type_infer(thk, jl_tuple_type, thk);
         }
@@ -612,14 +612,14 @@ void jl_set_datatype_super(jl_datatype_t *tt, jl_value_t *super)
 {
     if (!jl_is_datatype(super) || !jl_is_abstracttype(super) ||
         tt->name == ((jl_datatype_t*)super)->name ||
-        jl_subtype(super,(jl_value_t*)jl_vararg_type,0) ||
+        jl_is_tuple_type(super) ||
         jl_subtype(super,(jl_value_t*)jl_type_type,0)) {
         jl_errorf("invalid subtyping in definition of %s",tt->name->name->name);
     }
     tt->super = (jl_datatype_t*)super;
     gc_wb(tt, tt->super);
     if (jl_svec_len(tt->parameters) > 0) {
-        tt->name->cache = jl_emptysvec;
+        tt->name->cache = (jl_value_t*)jl_emptysvec;
         jl_reinstantiate_inner_types(tt);
     }
 }
@@ -628,7 +628,8 @@ void jl_set_datatype_super(jl_datatype_t *tt, jl_value_t *super)
 
 extern int jl_boot_file_loaded;
 
-static int svec_contains(jl_svet_t *svec, jl_value_t *x)
+static int type_contains(jl_value_t *ty, jl_value_t *x);
+static int svec_contains(jl_svec_t *svec, jl_value_t *x)
 {
     assert(jl_is_svec(svec));
     size_t i, l=jl_svec_len(svec);
@@ -646,7 +647,7 @@ static int type_contains(jl_value_t *ty, jl_value_t *x)
     if (jl_is_uniontype(ty))
         return type_contains(jl_fieldref(ty,0), x);
     if (jl_is_datatype(ty))
-        return svec_contains((jl_value_t*)((jl_datatype_t*)ty)->parameters, x);
+        return svec_contains((jl_svec_t*)(jl_value_t*)((jl_datatype_t*)ty)->parameters, x);
     return 0;
 }
 
@@ -684,7 +685,7 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
                     jl_svecset(newargtypes, 0, jl_svecref(argtypes, 0));
                     i++;
                 }
-                svecset(newargtypes, i, jl_wrap_Type(gf));
+                jl_svecset(newargtypes, i, jl_wrap_Type(gf));
                 i++;
                 for(; i < na+1; i++) {
                     jl_svecset(newargtypes, i, jl_svecref(argtypes, i-1));
@@ -758,9 +759,9 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
     }
     assert(jl_is_function(f));
     assert(jl_is_tuple(argtypes));
-    assert(jl_is_tupletype(t));
+    assert(jl_is_tuple_type(t));
 
-    jl_add_method((jl_function_t*)gf, argtypes, f, t, isstaged == jl_true);
+    jl_add_method((jl_function_t*)gf, t, f, argtypes, isstaged == jl_true);
     if (jl_boot_file_loaded &&
         f->linfo && f->linfo->ast && jl_is_expr(f->linfo->ast)) {
         jl_lambda_info_t *li = f->linfo;

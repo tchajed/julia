@@ -153,7 +153,7 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
                 li->ast = jl_compress_ast(li, li->ast);
                 gc_wb(li, li->ast);
             }
-            return (jl_value_t*)jl_new_closure(NULL, jl_emptysvec, li);
+            return (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_emptysvec, li);
         }
         if (jl_is_linenode(e)) {
             jl_lineno = jl_linenode_line(e);

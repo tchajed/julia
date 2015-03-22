@@ -1887,7 +1887,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                 JL_GC_POP();
                 return NULL;
             }
-            if (!jl_is_tupletype(tp0) && jl_is_leaf_type(tp0)) {
+            if (!jl_is_tuple_type(tp0) && jl_is_leaf_type(tp0)) {
                 Value *arg1 = emit_expr(args[1], ctx);
                 emit_typecheck(arg1, tp0, "typeassert", ctx);
                 JL_GC_POP();
@@ -1919,7 +1919,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                 JL_GC_POP();
                 return ConstantInt::get(T_int1,1);
             }
-            if (!jl_is_tupletype(tp0) && !jl_is_type_type(tp0)) {
+            if (!jl_is_tuple_type(tp0) && !jl_is_type_type(tp0)) {
                 if (jl_is_leaf_type(arg)) {
                     JL_GC_POP();
                     return ConstantInt::get(T_int1,0);
@@ -2205,7 +2205,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
 
         if (fldt == (jl_value_t*)jl_long_type) {
             // VA tuple
-            if (jl_is_tupletype(stt) && ctx->vaStack && symbol_eq(args[1], ctx->vaName)) {
+            if (jl_is_tuple_type(stt) && ctx->vaStack && symbol_eq(args[1], ctx->vaName)) {
                 Value *valen = emit_n_varargs(ctx);
                 Value *idx = emit_unbox(T_size,
                                         emit_unboxed(args[2], ctx),ity);
@@ -2216,7 +2216,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                 return tbaa_decorate(tbaa_user, builder.
                     CreateLoad(builder.CreateGEP(ctx->argArray,idx),false));
             }
-            if ((jl_is_structtype(stt) || jl_is_tupletype(stt)) && !jl_subtype((jl_value_t*)jl_module_type, (jl_value_t*)stt, 0)) {
+            if ((jl_is_structtype(stt) || jl_is_tuple_type(stt)) && !jl_subtype((jl_value_t*)jl_module_type, (jl_value_t*)stt, 0)) {
                 size_t nfields = jl_datatype_nfields(stt);
                 // integer index
                 if (jl_is_long(args[2])) {
@@ -3043,7 +3043,7 @@ static Value *emit_expr(jl_value_t *expr, jl_codectx_t *ctx, bool isboxed,
         else {
             extype = (jl_value_t*)jl_any_type;
         }
-        if (jl_is_tupletype(extype))
+        if (jl_is_tuple_type(extype))
             jl_add_linfo_root(ctx->linfo, extype);
         return literal_pointer_val(extype);
     }
