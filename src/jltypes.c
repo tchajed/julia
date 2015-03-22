@@ -116,7 +116,7 @@ static int jl_has_typevars__(jl_value_t *v, int incl_wildcard, jl_svec_t *p)
     // probably not necessary; no reason to use match() instead of subtype()
     // on the unconstrained version of a type
     //if (jl_is_typector(v))
-    //    return jl_tuple_len((((jl_typector_t*)v)->parameters) > 0);
+    //    return jl_svec_len((((jl_typector_t*)v)->parameters) > 0);
     return 0;
 }
 
@@ -266,7 +266,7 @@ jl_value_t *jl_type_union(jl_svec_t *types)
 {
     types = jl_compute_type_union(types);
     if (jl_svec_len(types) == 1)
-        return jl_tupleref(types, 0);
+        return jl_svecref(types, 0);
     if (jl_svec_len(types) == 0)
         return (jl_value_t*)jl_bottom_type;
     JL_GC_PUSH1(&types);
@@ -1689,7 +1689,7 @@ static int typekey_compare(jl_datatype_t *tt, jl_value_t **key, size_t n)
 {
     size_t j;
     for(j=0; j < n; j++) {
-        if (!type_eqv_(jl_tupleref(tt->parameters,j), key[j]))
+        if (!type_eqv_(jl_svecref(tt->parameters,j), key[j]))
             return 0;
     }
     return 1;
@@ -1773,7 +1773,7 @@ static void cache_type_(jl_value_t *type)
         size_t n = jl_svec_len(cache);
         jl_svec_t *nc = jl_alloc_svec_uninit(n+1);
         memcpy(nc->data, jl_svec_data(cache), sizeof(void*) * n);
-        jl_tupleset(nc, n, (jl_value_t*)type);
+        jl_svecset(nc, n, (jl_value_t*)type);
         ((jl_datatype_t*)type)->name->cache = (jl_value_t*)nc;
         gc_wb(((jl_datatype_t*)type)->name, nc);
     }
@@ -1960,9 +1960,9 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
     // don't instantiate "Foo" without parameters inside Foo
     if (t == tc && stack!=NULL)
         return (jl_value_t*)t;
-    size_t ntp = jl_tuple_len(tp);
+    size_t ntp = jl_svec_len(tp);
     assert(jl_is_datatype(tc));
-    assert(ntp == jl_tuple_len(((jl_datatype_t*)tc)->parameters));
+    assert(ntp == jl_svec_len(((jl_datatype_t*)tc)->parameters));
     jl_value_t **iparams;
     JL_GC_PUSHARGS(iparams, ntp);
     for(i=0; i < ntp+2; i++) iparams[i] = NULL;
@@ -2006,7 +2006,7 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
     jl_typestack_t *tmp = stack;
     jl_value_t *lkup = NULL;
     while (tmp != NULL) {
-        if (tmp->tt->name==tn && ntp==jl_tuple_len(tmp->tt->parameters) &&
+        if (tmp->tt->name==tn && ntp==jl_svec_len(tmp->tt->parameters) &&
             typekey_compare(tmp->tt, iparams, ntp)) {
             lkup = (jl_value_t*)tmp->tt;
             break;
@@ -2044,10 +2044,10 @@ void jl_reinstantiate_inner_types(jl_datatype_t *t)
     jl_typestack_t top;
     top.tt = (jl_datatype_t*)t;
     top.prev = NULL;
-    size_t n = jl_tuple_len(t->parameters);
+    size_t n = jl_svec_len(t->parameters);
     jl_value_t **env = (jl_value_t**)alloca(n*2*sizeof(void*));
     for(int i=0; i < n; i++) {
-        env[i*2] = jl_tupleref(t->parameters,i);
+        env[i*2] = jl_svecref(t->parameters,i);
         env[i*2+1] = env[i*2];
     }
     t->super = (jl_datatype_t*)inst_type_w_((jl_value_t*)t->super, env, n, &top, 1);

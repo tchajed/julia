@@ -82,6 +82,11 @@ jl_svec_t *jl_svec_append(jl_svec_t *a, jl_svec_t *b)
     return c;
 }
 
+jl_svec_t *jl_svec_copy(jl_svec_t *a)
+{
+    return jl_svec_append(a, jl_emptysvec);
+}
+
 jl_svec_t *jl_svec_fill(size_t n, jl_value_t *x)
 {
     if (n==0) return jl_emptysvec;

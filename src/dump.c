@@ -788,7 +788,7 @@ static void jl_serialize_methtable_from_mod(ios_t *s, jl_module_t *m, jl_sym_t *
         struct _chain *next;
     } *chain = NULL;
     jl_methlist_t *ml = mt->defs;
-    while (ml != JL_NULL) {
+    while (ml != jl_nothing) {
         if (jl_is_submodule(ml->func->linfo->module, jl_current_module)) {
             struct _chain *link = (struct _chain*)alloca(sizeof(struct _chain));
             link->ml = ml;
@@ -1752,24 +1752,24 @@ jl_module_t *jl_restore_new_module(const char *fname)
         jl_methtable_t *mt = (jl_methtable_t*)methtable_list.items[i];
         jl_array_t *cache_targ = mt->cache_targ;
         jl_array_t *cache_arg1 = mt->cache_arg1;
-        mt->cache_targ = (jl_array_t*)JL_NULL;
-        mt->cache_arg1 = (jl_array_t*)JL_NULL;
-        if (cache_targ != JL_NULL) {
+        mt->cache_targ = (jl_array_t*)jl_nothing;
+        mt->cache_arg1 = (jl_array_t*)jl_nothing;
+        if (cache_targ != jl_nothing) {
             size_t j, l = jl_array_len(cache_targ);
             for (j = 0; j < l; j++) {
                 jl_methlist_t *ml = (jl_methlist_t*)jl_cellref(cache_targ, j);
-                while (ml != NULL && ml != JL_NULL) {
+                while (ml != NULL && ml != jl_nothing) {
                     assert(!ml->isstaged);
                     jl_method_cache_insert(mt, ml->sig, ml->func);
                     ml = ml->next;
                 }
             }
         }
-        if (cache_arg1 != JL_NULL) {
+        if (cache_arg1 != jl_nothing) {
             size_t j, l = jl_array_len(cache_arg1);
             for (j = 0; j < l; j++) {
                 jl_methlist_t *ml = (jl_methlist_t*)jl_cellref(cache_arg1, j);
-                while (ml != NULL && ml != JL_NULL) {
+                while (ml != NULL && ml != jl_nothing) {
                     assert(!ml->isstaged);
                     jl_method_cache_insert(mt, ml->sig, ml->func);
                     ml = ml->next;
@@ -1815,7 +1815,7 @@ void jl_init_serializer(void)
                      jl_symbol("getfield"),            jl_symbol("Float64"),
                      jl_symbol("apply_type"),          jl_symbol("size"),
                      jl_symbol("Any"),                 jl_symbol("sub_int"),
-                     jl_symbol("tupleref"),            jl_symbol("colon"),
+                     jl_symbol("colon"),
                      jl_symbol("call1"),               jl_symbol("keys"),
                      jl_symbol("Bool"),                jl_symbol("string"),
                      jl_symbol("not_int"),             jl_symbol("zext_int"),
@@ -1843,7 +1843,7 @@ void jl_init_serializer(void)
                      jl_symbol("next"),                jl_symbol("BoundsError"),
                      jl_symbol("boundscheck"),         jl_symbol("AbstractString"),
                      jl_symbol("setindex!"),           jl_symbol("bytestring"),
-                     jl_symbol("tuplelen"),            jl_symbol("promote_type"),
+                     jl_symbol("promote_type"),
                      jl_symbol("data"),                jl_symbol("error"),
                      jl_symbol("checked_trunc_sint"),  jl_symbol("ptr_arg_unsafe_convert"),
                      jl_symbol("ptr_arg_cconvert"),

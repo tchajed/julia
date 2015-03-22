@@ -778,6 +778,7 @@ DLLEXPORT jl_svec_t *jl_svec2(void *a, void *b);
 DLLEXPORT jl_svec_t *jl_alloc_svec(size_t n);
 DLLEXPORT jl_svec_t *jl_alloc_svec_uninit(size_t n);
 DLLEXPORT jl_svec_t *jl_svec_append(jl_svec_t *a, jl_svec_t *b);
+jl_svec_t *jl_svec_copy(jl_svec_t *a);
 DLLEXPORT jl_svec_t *jl_svec_fill(size_t n, jl_value_t *x);
 DLLEXPORT jl_value_t *jl_tupletype_fill(size_t n, jl_value_t *v);
 DLLEXPORT jl_sym_t *jl_symbol(const char *str);
