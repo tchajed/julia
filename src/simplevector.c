@@ -10,7 +10,7 @@ DLLEXPORT jl_svec_t *jl_svec(size_t n, ...)
     va_list args;
     if (n == 0) return jl_emptysvec;
     va_start(args, n);
-    jl_tuple_t *jv = jl_alloc_svec_uninit(n);
+    jl_svec_t *jv = jl_alloc_svec_uninit(n);
     for(size_t i=0; i < n; i++) {
         jl_svecset(jv, i, va_arg(args, jl_value_t*));
     }
@@ -49,15 +49,15 @@ jl_svec_t *jl_alloc_svec_uninit(size_t n)
 {
     if (n == 0) return jl_emptysvec;
 #ifdef OVERLAP_TUPLE_LEN
-    jl_svec_t *jv = (jl_tuple_t*)newobj((jl_value_t*)jl_simplevector_type, n);
+    jl_svec_t *jv = (jl_svec_t*)newobj((jl_value_t*)jl_simplevector_type, n);
 #else
-    jl_svec_t *jv = (jl_tuple_t*)newobj((jl_value_t*)jl_simplevector_type, n+1);
+    jl_svec_t *jv = (jl_svec_t*)newobj((jl_value_t*)jl_simplevector_type, n+1);
 #endif
     jl_svec_set_len_unsafe(jv, n);
     return jv;
 }
 
-jl_tuple_t *jl_alloc_svec(size_t n)
+jl_svec_t *jl_alloc_svec(size_t n)
 {
     if (n == 0) return jl_emptysvec;
     jl_svec_t *jv = jl_alloc_svec_uninit(n);
