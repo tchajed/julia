@@ -324,7 +324,7 @@ static jl_value_t *scm_to_julia_(value_t e, int eo)
                     e = cdr_(e);
                 }
                 return
-                    (jl_value_t*)jl_new_lambda_info((jl_value_t*)ex, jl_empty_svec);
+                    (jl_value_t*)jl_new_lambda_info((jl_value_t*)ex, jl_emptysvec);
             }
 
             e = cdr_(e);
@@ -646,7 +646,7 @@ jl_lambda_info_t *jl_wrap_expr(jl_value_t *expr)
         expr = (jl_value_t*)bo;
     }
     jl_cellset(le->args, 2, expr);
-    jl_lambda_info_t *li = jl_new_lambda_info((jl_value_t*)le, jl_empty_svec);
+    jl_lambda_info_t *li = jl_new_lambda_info((jl_value_t*)le, jl_emptysvec);
     JL_GC_POP();
     return li;
 }

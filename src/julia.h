@@ -339,6 +339,7 @@ extern DLLEXPORT jl_datatype_t *jl_gensym_type;
 extern DLLEXPORT jl_datatype_t *jl_simplevector_type;
 extern DLLEXPORT jl_typename_t *jl_tuple_typename;
 extern DLLEXPORT jl_datatype_t *jl_anytuple_type;
+#define jl_tuple_type jl_anytuple_type
 extern DLLEXPORT jl_datatype_t *jl_ntuple_type;
 extern DLLEXPORT jl_typename_t *jl_ntuple_typename;
 extern DLLEXPORT jl_datatype_t *jl_tvar_type;
@@ -1045,12 +1046,12 @@ jl_value_t *jl_static_eval(jl_value_t *ex, void *ctx_, jl_module_t *mod,
                            jl_value_t *sp, jl_expr_t *ast, int sparams, int allow_alloc);
 int jl_is_toplevel_only_expr(jl_value_t *e);
 jl_module_t *jl_base_relative_to(jl_module_t *m);
-void jl_type_infer(jl_lambda_info_t *li, jl_value_t *argtypes, jl_lambda_info_t *def);
+void jl_type_infer(jl_lambda_info_t *li, jl_tupletype_t *argtypes, jl_lambda_info_t *def);
 
-jl_function_t *jl_method_lookup_by_type(jl_methtable_t *mt, jl_value_t *types,
+jl_function_t *jl_method_lookup_by_type(jl_methtable_t *mt, jl_tupletype_t *types,
                                         int cache, int inexact);
 jl_function_t *jl_method_lookup(jl_methtable_t *mt, jl_value_t **args, size_t nargs, int cache);
-jl_value_t *jl_gf_invoke(jl_function_t *gf, jl_value_t *types,
+jl_value_t *jl_gf_invoke(jl_function_t *gf, jl_tupletype_t *types,
                          jl_value_t **args, size_t nargs);
 
 // AST access

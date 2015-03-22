@@ -165,7 +165,7 @@ DLLEXPORT void NORETURN jl_bounds_error_ints(jl_value_t *v, size_t *idxs, size_t
     size_t i;
     jl_value_t *t = NULL;
     JL_GC_PUSH2(&v, &t); // root arguments so the caller doesn't need to
-    t = jl_alloc_svec(nidxs);
+    t = (jl_value_t*)jl_alloc_svec(nidxs);
     for (i = 0; i < nidxs; i++) {
         jl_svecset(t, i, jl_box_long(idxs[i]));
     }
@@ -428,7 +428,7 @@ JL_CALLABLE(jl_f_apply)
                     (jl_function_t*)jl_get_global(jl_base_module, jl_symbol("append_any"));
                 if (jl_append_any_func == NULL) {
                     // error if append_any not available
-                    JL_TYPECHK(apply, tuple, args[i]);
+                    JL_TYPECHK(apply, tuple, jl_typeof(args[i]));
                 }
             }
             jl_value_t *argarr = jl_apply(jl_append_any_func, &args[1], nargs-1);
