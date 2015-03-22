@@ -58,7 +58,7 @@ static int cache_match_by_type(jl_value_t **types, size_t n, jl_tupletype_t *sig
             }
         }
         jl_value_t *a = types[i];
-        if (jl_is_tupletype(decl)) {
+        if (jl_is_tuple_type(decl)) {
             // tuples don't have to match exactly, to avoid caching
             // signatures for tuples of every length
             if (!jl_subtype(a, decl, 0))
@@ -113,7 +113,7 @@ static inline int cache_match(jl_value_t **args, size_t n, jl_tupletype_t *sig,
               hash-consed, so pointer comparison should work.
             */
         }
-        else if (jl_is_tupletype(decl)) {
+        else if (jl_is_tuple_type(decl)) {
             // tuples don't have to match exactly, to avoid caching
             // signatures for tuples of every length
             jl_datatype_t *ta = (jl_datatype_t*)jl_typeof(a);

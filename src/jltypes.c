@@ -400,9 +400,8 @@ static jl_value_t *intersect_tuple(jl_datatype_t *a, jl_datatype_t *b,
     size_t al = jl_svec_len(ap), bl = jl_svec_len(bp);
     int bot=0;
     size_t n = tuple_intersect_size(ap, a->va, bp, b->va, &bot);
-    if (bot)
-        return (jl_value_t*)jl_bottom_type;
-    if (n == 0) jl_typeof(jl_emptytuple);
+    if (bot) return (jl_value_t*)jl_bottom_type;
+    if (n == 0) return jl_typeof(jl_emptytuple);
     jl_svec_t *tc = jl_alloc_svec(n);
     jl_value_t *result = (jl_value_t*)tc;
     jl_value_t *ce = NULL;
@@ -616,7 +615,7 @@ static jl_value_t *type_to_static_parameter_value(jl_value_t *t)
                 changed = 1;
             }
         }
-        jl_value_t *result = changed ? jl_apply_tuple_type(np, ((jl_datatype_t*)t)->va) : t;
+        jl_value_t *result = changed ? (jl_value_t*)jl_apply_tuple_type(np, ((jl_datatype_t*)t)->va) : t;
         JL_GC_POP();
         return result;
     }
@@ -827,7 +826,7 @@ static jl_value_t *jl_type_intersect(jl_value_t *a, jl_value_t *b,
                 // don't know N yet, so add a constraint for it based on
                 // the length of the other tuple
                 if (((jl_datatype_t*)a)->va) {
-                    b = jl_apply_tuple_type(((jl_datatype_t*)b)->parameters, 1);
+                    b = (jl_value_t*)jl_apply_tuple_type(((jl_datatype_t*)b)->parameters, 1);
                     if (jl_is_typevar(lenvar)) {
                         // store "at least N" constraints in the <: env
                         for(i=0; i < penv->n; i+=2) {
@@ -1681,7 +1680,7 @@ DLLEXPORT jl_value_t *jl_tupletype_fill(size_t n, jl_value_t *v)
     jl_value_t *p = NULL;
     JL_GC_PUSH1(&p);
     p = (jl_value_t*)jl_svec_fill(n, v);
-    p = jl_apply_tuple_type((jl_svec_t*)p, 0);
+    p = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)p, 0);
     JL_GC_POP();
     return p;
 }
@@ -1794,11 +1793,14 @@ typedef struct _jl_typestack_t {
     struct _jl_typestack_t *prev;
 } jl_typestack_t;
 
-jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
+static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
                                 jl_typestack_t *stack, int check);
+static jl_svec_t *inst_all(jl_svec_t *p, jl_value_t **env, size_t n,
+                           jl_typestack_t *stack, int check);
 
 static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **iparams, size_t ntp,
-                                 int cacheable, int isabstract, jl_typestack_t *stack)
+                                 int cacheable, int isabstract, jl_typestack_t *stack,
+                                 jl_value_t **env, size_t n)
 {
     jl_typestack_t top;
     jl_typename_t *tn = dt->name;
@@ -1886,12 +1888,12 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     else
         ndt->ninitialized = dt->ninitialized;
     if (cacheable) cache_type_((jl_value_t*)ndt);
-    result = (jl_value_t*)ndt;
+    jl_value_t *result = (jl_value_t*)ndt;
     JL_GC_POP();
     return result;
 }
 
-DLLEXPORT jl_value_t *jl_apply_tuple_type(jl_svec_t *params, int va)
+DLLEXPORT jl_tupletype_t *jl_apply_tuple_type(jl_svec_t *params, int va)
 {
     size_t l = jl_svec_len(params);
     int isabstract = va;
@@ -1903,14 +1905,14 @@ DLLEXPORT jl_value_t *jl_apply_tuple_type(jl_svec_t *params, int va)
         }
     }
     jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, jl_svec_data(params), l,
-                                                       !isabstract, isabstract, NULL);
+                                                       !isabstract, isabstract, NULL, NULL, 0);
     if (va) ndt->va = 1;
     return ndt;
 }
 
 jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np)
 {
-    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL);
+    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL, NULL, 0);
 }
 
 static jl_svec_t *inst_all(jl_svec_t *p, jl_value_t **env, size_t n,
@@ -2021,7 +2023,8 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
         JL_GC_POP();
         return lkup;
     }
-    jl_value_t *result = inst_datatype(tn, NULL, iparams, ntp);
+    jl_value_t *result = inst_datatype((jl_datatype_t*)tc, NULL, iparams, ntp, cacheable, isabstract,
+                                       stack, env, n);
     JL_GC_POP();
     return result;
 }
@@ -2135,7 +2138,7 @@ static int jl_subtype_le(jl_value_t *a, jl_value_t *b, int ta, int invariant)
                 if (tuple_all_subtype((jl_datatype_t*)a, tp, ta, invariant)) {
                     if (invariant) {
                         return (jl_datatype_t*)b != jl_ntuple_type ||
-                            jl_subtype_le((jl_value_t*)jl_tuple_type, a, 0, 1);
+                            jl_subtype_le((jl_value_t*)jl_anytuple_type, a, 0, 1);
                     }
                     return 1;
                 }
@@ -2713,10 +2716,9 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
         if (jl_is_datatype(parent) &&
             ((jl_datatype_t*)parent)->name == jl_ntuple_typename) {
             jl_svec_t *tp = ((jl_datatype_t*)parent)->parameters;
-            size_t alen = jl_nparams(child);
             // if child has a sequence type, there exists no N such that
             // NTuple[N,Any] could be its supertype.
-            if (child->va)
+            if (((jl_datatype_t*)child)->va)
                 return jl_false;
             jl_value_t *nt_len = jl_svecref(tp,0);
             jl_value_t *childlen = jl_box_long(jl_nparams(child));
@@ -2729,8 +2731,9 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
             else {
                 return jl_false;
             }
-            jl_value_t *p_seq = jl_apply_tuple_type(jl_svecref(tp,1), 1);
+            jl_value_t *p_seq = (jl_value_t*)jl_svec1(jl_svecref(tp,1));
             JL_GC_PUSH1(&p_seq);
+            p_seq = (jl_value_t*)jl_apply_tuple_type(p_seq, 1);
             tmp = tuple_match((jl_tupletype_t*)child, (jl_tupletype_t*)p_seq,
                               env, morespecific, invariant);
             JL_GC_POP();
@@ -2748,8 +2751,8 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
             ((jl_datatype_t*)child)->name == jl_ntuple_typename) {
             // only ((T>:S)...,) can be a supertype of NTuple[N,S]
             jl_value_t *ntp = jl_tparam(child, 1);
-            if (jl_nparams(b) == 1 && ((jl_datatype_t*)b)->va) {
-                return type_match_(ntp, jl_tparam0(b), env, morespecific, invariant);
+            if (jl_nparams(parent) == 1 && ((jl_datatype_t*)parent)->va) {
+                return type_match_(ntp, jl_tparam0(parent), env, morespecific, invariant);
             }
         }
         return jl_false;
@@ -2785,7 +2788,7 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
     if (((jl_datatype_t*)child)->name == jl_type_type->name &&
         ttb->name != jl_type_type->name) {
         // Type{T} also matches >:typeof(T)
-        return type_match_(jl_full_type(jl_tparam0(child)),
+        return type_match_(jl_typeof(jl_tparam0(child)),
                            parent, env, morespecific, 0);
     }
     return jl_false;
@@ -2860,7 +2863,7 @@ void jl_init_types(void)
     jl_symbol_type = jl_sym_type;
     jl_simplevector_type = jl_new_uninitialized_datatype(1);
 
-    jl_emptysvec = (jl_svec_t*)newobj(jl_simplevector_type, 1);
+    jl_emptysvec = (jl_svec_t*)newobj((jl_value_t*)jl_simplevector_type, 1);
     jl_svec_set_len_unsafe(jl_emptysvec, 0);
 
     jl_any_type = jl_new_abstracttype((jl_value_t*)jl_symbol("Any"), NULL, jl_emptysvec);
@@ -2980,14 +2983,14 @@ void jl_init_types(void)
                                        (jl_value_t*)jl_bottom_type,(jl_value_t*)jl_any_type);
     jl_type_type->parameters = jl_svec(1, tttvar);
 
-    tv = jl_svec2(tvar("N"), tvar("T"));
+    jl_svec_t *tv = jl_svec2(tvar("N"), tvar("T"));
     jl_ntuple_type = jl_new_abstracttype((jl_value_t*)jl_symbol("NTuple"),
                                          jl_any_type, tv);
     jl_ntuple_typename = jl_ntuple_type->name;
 
-    jl_value_t *empty_tuple_type = jl_apply_tuple_type(jl_emptysvec, 0);
+    jl_tupletype_t *empty_tuple_type = jl_apply_tuple_type(jl_emptysvec, 0);
     jl_emptytuple = newstruct(empty_tuple_type);
-    empty_tuple_type->instance = jl_emptytuple;
+    ((jl_datatype_t*)empty_tuple_type)->instance = jl_emptytuple;
 
     // non-primitive definitions follow
     jl_int32_type = NULL;
