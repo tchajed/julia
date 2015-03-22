@@ -1255,7 +1255,7 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
             builder.Insert(stacksave);
             Value *tempSpace = builder.CreateAlloca(llvm_st);
             builder.CreateStore(strct, tempSpace);
-            jl_value_t *jt = jl_t0(stt->types);
+            jl_value_t *jt = jl_field_type(stt,0);
             if (!stt->uid) {
                 // add root for types not cached
                 jl_add_linfo_root(ctx->linfo, (jl_value_t*)stt);
@@ -1827,8 +1827,8 @@ static Value *emit_new_struct(jl_value_t *ty, size_t nargs, jl_value_t **args, j
         builder.CreateStore(literal_pointer_val((jl_value_t*)ty),
                             emit_typeptr_addr(strct));
         if (f1) {
-            if (!jl_subtype(expr_type(args[1],ctx), jl_t0(sty->types), 0))
-                emit_typecheck(f1, jl_t0(sty->types), "new", ctx);
+            if (!jl_subtype(expr_type(args[1],ctx), jl_field_type(sty,0), 0))
+                emit_typecheck(f1, jl_field_type(sty,0), "new", ctx);
             emit_setfield(sty, strct, 0, f1, ctx, false, false);
             ctx->argDepth = fieldStart;
             if (nf > 1 && needroots)

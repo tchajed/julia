@@ -64,7 +64,8 @@ int jl_is_type(jl_value_t *v)
 {
     jl_value_t *t = jl_typeof(v);
     //if (jl_is_typevar(v)) return 1;
-    return (t == jl_datatype_type || t == jl_uniontype_type || t == jl_typector_type);
+    return (t == (jl_value_t*)jl_datatype_type || t == (jl_value_t*)jl_uniontype_type ||
+            t == (jl_value_t*)jl_typector_type);
 }
 
 STATIC_INLINE int is_unspec(jl_datatype_t *dt)
@@ -401,7 +402,7 @@ static jl_value_t *intersect_tuple(jl_datatype_t *a, jl_datatype_t *b,
     size_t n = tuple_intersect_size(ap, a->va, bp, b->va, &bot);
     if (bot)
         return (jl_value_t*)jl_bottom_type;
-    if (n == 0) return (jl_value_t*)jl_emptytuple->type;
+    if (n == 0) jl_typeof(jl_emptytuple);
     jl_svec_t *tc = jl_alloc_svec(n);
     jl_value_t *result = (jl_value_t*)tc;
     jl_value_t *ce = NULL;
@@ -429,7 +430,7 @@ static jl_value_t *intersect_tuple(jl_datatype_t *a, jl_datatype_t *b,
                 // (X∩Y)==∅ → (X...)∩(Y...) == ()
                 if (n == 1) {
                     JL_GC_POP();
-                    return (jl_value_t*)jl_emptytuple->type;
+                    return (jl_value_t*)jl_typeof(jl_emptytuple);
                 }
                 jl_svec_set_len_unsafe(tc,jl_svec_len(tc)-1);
                 goto done_intersect_tuple;
@@ -464,7 +465,7 @@ static jl_value_t *intersect_tag(jl_datatype_t *a, jl_datatype_t *b,
         jl_svecset(p, 0, ti);
         ti = jl_type_intersect(jl_tparam1(a),jl_tparam1(b),penv,eqc,var);
         if (ti==(jl_value_t*)jl_bottom_type ||
-            jl_t0(p)==(jl_value_t*)jl_bottom_type) {
+            jl_svecref(p,0)==(jl_value_t*)jl_bottom_type) {
             JL_GC_POP();
             return (jl_value_t*)jl_bottom_type;
         }
@@ -1680,7 +1681,7 @@ DLLEXPORT jl_value_t *jl_tupletype_fill(size_t n, jl_value_t *v)
     jl_value_t *p = NULL;
     JL_GC_PUSH1(&p);
     p = (jl_value_t*)jl_svec_fill(n, v);
-    p = jl_apply_tuple_type(p, 0);
+    p = jl_apply_tuple_type((jl_svec_t*)p, 0);
     JL_GC_POP();
     return p;
 }
@@ -1793,27 +1794,8 @@ typedef struct _jl_typestack_t {
     struct _jl_typestack_t *prev;
 } jl_typestack_t;
 
-DLLEXPORT jl_value_t *jl_apply_tuple_type(jl_svec_t *params, int va)
-{
-    size_t l = jl_svec_len(params);
-    int isabstract = va;
-    if (!va) {
-        for(size_t i=0; i < l; i++) {
-            if (!jl_is_leaf_type(jl_svecref(params,i))) {
-                isabstract = 1; break;
-            }
-        }
-    }
-    jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, jl_svec_data(params), l,
-                                                       !isabstract, isabstract, NULL);
-    if (va) ndt->va = 1;
-    return ndt;
-}
-
-jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np)
-{
-    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL);
-}
+jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
+                                jl_typestack_t *stack, int check);
 
 static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **iparams, size_t ntp,
                                  int cacheable, int isabstract, jl_typestack_t *stack)
@@ -1841,7 +1823,7 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     JL_GC_PUSH2(&p, &ndt);
     if (p == NULL) {
         p = jl_alloc_svec_uninit(ntp);
-        for(i=0; i < ntp; i++)
+        for(unsigned i=0; i < ntp; i++)
             jl_svecset(p, i, iparams[i]);
     }
 
@@ -1907,6 +1889,28 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     result = (jl_value_t*)ndt;
     JL_GC_POP();
     return result;
+}
+
+DLLEXPORT jl_value_t *jl_apply_tuple_type(jl_svec_t *params, int va)
+{
+    size_t l = jl_svec_len(params);
+    int isabstract = va;
+    if (!va) {
+        for(size_t i=0; i < l; i++) {
+            if (!jl_is_leaf_type(jl_svecref(params,i))) {
+                isabstract = 1; break;
+            }
+        }
+    }
+    jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, jl_svec_data(params), l,
+                                                       !isabstract, isabstract, NULL);
+    if (va) ndt->va = 1;
+    return ndt;
+}
+
+jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np)
+{
+    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL);
 }
 
 static jl_svec_t *inst_all(jl_svec_t *p, jl_value_t **env, size_t n,
