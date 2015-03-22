@@ -2733,7 +2733,7 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
             }
             jl_value_t *p_seq = (jl_value_t*)jl_svec1(jl_svecref(tp,1));
             JL_GC_PUSH1(&p_seq);
-            p_seq = (jl_value_t*)jl_apply_tuple_type(p_seq, 1);
+            p_seq = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)p_seq, 1);
             tmp = tuple_match((jl_tupletype_t*)child, (jl_tupletype_t*)p_seq,
                               env, morespecific, invariant);
             JL_GC_POP();

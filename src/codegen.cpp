@@ -260,6 +260,7 @@ static Value *V_null;
 static GlobalVariable *jltrue_var;
 static GlobalVariable *jlfalse_var;
 static GlobalVariable *jlemptysvec_var;
+static GlobalVariable *jlemptytuple_var;
 #if defined(_CPU_X86_)
 #define JL_NEED_FLOATTEMP_VAR 1
 #endif
@@ -783,7 +784,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
     if (rt) {
         JL_TYPECHK(cfunction, type, rt);
     }
-    JL_TYPECHK(cfunction, svec, argt);
+    JL_TYPECHK(cfunction, simplevector, argt);
     JL_TYPECHK(cfunction, type, argt);
     JL_TYPECHK(cfunction, function, (jl_value_t*)f);
     if (!jl_is_gf(f))
@@ -794,7 +795,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
         jl_error("only functions with less than 64 arguments are c-callable");
 
     uint64_t isref = 0; // bit vector of which argument types are a subtype of Type{Ref{T}}
-    jl_value_t *sigt; // type signature with Ref{} annotations removed
+    jl_value_t *sigt = NULL; // type signature with Ref{} annotations removed
     JL_GC_PUSH1(&sigt);
     sigt = (jl_value_t*)jl_alloc_svec(nargs);
     for (i = 0; i < nargs; i++) {
@@ -810,6 +811,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
         }
         jl_svecset(sigt, i, ati);
     }
+    sigt = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)sigt, false);
 
     if (rt != NULL) {
         if (jl_is_abstract_ref_type(rt)) {
@@ -825,8 +827,8 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
         }
     }
 
-    jl_function_t *ff = jl_get_specialization(f, (jl_svec_t*)sigt);
-    if (ff != NULL && ff->env==jl_emptysvec && ff->linfo != NULL) {
+    jl_function_t *ff = jl_get_specialization(f, (jl_tupletype_t*)sigt);
+    if (ff != NULL && ff->env==(jl_value_t*)jl_emptysvec && ff->linfo != NULL) {
         jl_lambda_info_t *li = ff->linfo;
         if (!jl_types_equal((jl_value_t*)li->specTypes, sigt)) {
             jl_errorf("cfunction: type signature of %s does not match specification",
@@ -931,15 +933,22 @@ extern "C" DLLEXPORT
 void *jl_get_llvmf(jl_function_t *f, jl_svec_t *types, bool getwrapper)
 {
     jl_function_t *sf = f;
+    jl_tupletype_t *tt = NULL;
+    JL_GC_PUSH(&tt);
+    tt = jl_apply_tuple_type(types, false);
     if (types != NULL) {
-        if (!jl_is_function(f) || !jl_is_gf(f))
+        if (!jl_is_function(f) || !jl_is_gf(f)) {
+            JL_GC_POP();
             return NULL;
-        sf = jl_get_specialization(f, types);
+        }
+        sf = jl_get_specialization(f, tt);
     }
     if (sf == NULL || sf->linfo == NULL) {
-        sf = jl_method_lookup_by_type(jl_gf_mtable(f), types, 0, 0);
-        if (sf == jl_bottom_func)
+        sf = jl_method_lookup_by_type(jl_gf_mtable(f), tt, 0, 0);
+        if (sf == jl_bottom_func) {
+            JL_GC_POP();
             return NULL;
+        }
         jl_printf(JL_STDERR,
                   "Warning: Returned code may not match what actually runs.\n");
     }
@@ -963,6 +972,7 @@ void *jl_get_llvmf(jl_function_t *f, jl_svec_t *types, bool getwrapper)
     else {
         llvmf = to_function(sf->linfo);
     }
+    JL_GC_POP();
     return llvmf;
 }
 
@@ -1484,7 +1494,7 @@ static bool is_getfield_nonallocating(jl_datatype_t *ty, jl_value_t *fld)
     return true;
 }
 
-static bool isbits_spec(jl_value_t *jt, bool allow_unsized)
+static bool isbits_spec(jl_value_t *jt, bool allow_unsized = true)
 {
     return jl_isbits(jt) && jl_is_leaf_type(jt) && (allow_unsized ||
         ((jl_is_bitstype(jt) && jl_datatype_size(jt) > 0) ||
@@ -1588,7 +1598,7 @@ static Value *emit_lambda_closure(jl_value_t *expr, jl_codectx_t *ctx)
     if (capt == NULL || jl_array_dim0(capt) == 0) {
         // no captured vars; lift
         jl_value_t *fun =
-            (jl_value_t*)jl_new_closure(NULL, jl_emptysvec,
+            (jl_value_t*)jl_new_closure(NULL, (jl_value_t*)jl_emptysvec,
                                         (jl_lambda_info_t*)expr);
         jl_add_linfo_root(ctx->linfo, fun);
         return literal_pointer_val(fun);
@@ -1689,7 +1699,7 @@ static Value *emit_getfield(jl_value_t *expr, jl_sym_t *name, jl_codectx_t *ctx)
         unsigned idx = jl_field_index(sty, name, 0);
         if (idx != (unsigned)-1) {
             Value *strct = emit_expr(expr, ctx, false);
-            emit_getfield_knownidx(strct, idx, sty);
+            emit_getfield_knownidx(strct, idx, sty, ctx);
         }
     }
     // TODO: attempt better codegen for approximate types, if the types
@@ -1758,10 +1768,8 @@ static Value *emit_f_is(jl_value_t *rt1, jl_value_t *rt2,
         }
         bool isStruct = at1->isStructTy();
         if ((isStruct || at1->isVectorTy()) && !ptr_comparable) {
-            jl_svec_t *types;
-            if (jl_is_datatype(rt1)) {
-                types = ((jl_datatype_t*)rt1)->types;
-            }
+            assert(jl_is_datatype(rt1));
+            jl_svec_t *types = ((jl_datatype_t*)rt1)->types;
             answer = ConstantInt::get(T_int1, 1);
             size_t l = jl_svec_len(types);
             unsigned j = 0;
@@ -1825,6 +1833,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         if (ctx->linfo->inferred) {
             jl_svec_t *aty = call_arg_types(&args[1], nargs, ctx);
             rt1 = (jl_value_t*)aty;
+            rt1 = (jl_value_t*)jl_apply_tuple_type(aty,false);
             // attempt compile-time specialization for inferred types
             if (aty != NULL) {
                 /*
@@ -1834,7 +1843,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                       jl_sprint((jl_value_t*)aty));
                   }
                 */
-                f = jl_get_specialization(f, aty);
+                f = jl_get_specialization(f, (jl_tupletype_t*)rt1);
                 if (f != NULL) {
                     assert(f->linfo->functionObject != NULL);
                     *theFptr = (Value*)f->linfo->functionObject;
@@ -1853,7 +1862,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
     else if (f->fptr == &jl_f_typeof && nargs==1) {
         jl_value_t *aty = expr_type(args[1], ctx); rt1 = aty;
         if (!jl_is_typevar(aty) && aty != (jl_value_t*)jl_any_type &&
-            jl_type_intersection(aty,(jl_value_t*)jl_svec_type)==(jl_value_t*)jl_bottom_type) {
+            jl_type_intersection(aty,(jl_value_t*)jl_simplevector_type)==(jl_value_t*)jl_bottom_type) {
             Value *arg1 = emit_expr(args[1], ctx);
             if (jl_is_leaf_type(aty)) {
                 if (jl_is_type_type(aty))
@@ -1966,7 +1975,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
     else if (f->fptr == &jl_f_tuple) {
         if (nargs == 0) {
             JL_GC_POP();
-            return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlemptytuple_val)));
+            return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlemptytuple_var)));
         }
         size_t i;
         for(i=0; i < nargs; i++) {
@@ -1976,7 +1985,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         }
         if (i >= nargs && ctx->linfo->specTypes) {
             rt1 = expr_type(expr, ctx);
-            if (jl_is_tuple_type(rt1) && nargs == jl_tuple_nfields(rt1)) {
+            if (jl_is_tuple_type(rt1) && nargs == jl_datatype_nfields(rt1)) {
                 for(i=0; i < nargs; i++) {
                     // paranoia: make sure the inferred tuple type matches what
                     // we are about to construct.
@@ -1998,7 +2007,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                         }
                         assert(tpl != NULL);
                         Value *elt = emit_unbox(ety,emit_unboxed(args[i+1],ctx),jl_field_type(rt1,i));
-                        tpl = emit_tupleset(tpl,ConstantInt::get(T_size,i),elt,rt1,ctx);
+                        tpl = emit_setfield((jl_tupletype_t*)rt1,tpl,i-1,elt,ctx,false,false);
                     }
                     JL_GC_POP();
                     if (ty->isEmptyTy())
@@ -2208,7 +2217,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
             if (jl_is_tuple_type(stt) && ctx->vaStack && symbol_eq(args[1], ctx->vaName)) {
                 Value *valen = emit_n_varargs(ctx);
                 Value *idx = emit_unbox(T_size,
-                                        emit_unboxed(args[2], ctx),ity);
+                                        emit_unboxed(args[2], ctx),fldt);
                 idx = emit_bounds_check(builder.CreateGEP(ctx->argArray, ConstantInt::get(T_size, ctx->nReqArgs)),
                         (jl_value_t*)jl_any_type, idx, valen, ctx);
                 idx = builder.CreateAdd(idx, ConstantInt::get(T_size, ctx->nReqArgs));
@@ -2218,23 +2227,23 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
             }
             if ((jl_is_structtype(stt) || jl_is_tuple_type(stt)) && !jl_subtype((jl_value_t*)jl_module_type, (jl_value_t*)stt, 0)) {
                 size_t nfields = jl_datatype_nfields(stt);
+                Value *strct = emit_expr(args[1], ctx);
                 // integer index
                 if (jl_is_long(args[2])) {
                     // known index
                     size_t idx = jl_unbox_long(args[2])-1;
                     if (idx < nfields) {
-                        Value *fld = emit_getfield_knownidx(args[1],
-                                                   (jl_sym_t*)jl_field_name(stt, i),
-                                                   ctx);
+                        Value *fld = emit_getfield_knownidx(strct,
+                                                   idx,
+                                                   stt, ctx);
                         JL_GC_POP();
                         return fld;
                     }
                 }
                 else {
                     // unknown index
-                    Value *strct = emit_expr(args[1], ctx);
                     Value *idx = emit_unbox(T_size, emit_unboxed(args[2], ctx), (jl_value_t*)jl_long_type);
-                    emit_getfield_unknownidx(strct, idx, jtt);
+                    emit_getfield_unknownidx(strct, idx, stt, ctx);
                 }
             }
         }
@@ -4748,6 +4757,7 @@ static void init_julia_llvm_env(Module *m)
     jltrue_var = global_to_llvm("jl_true", (void*)&jl_true, m);
     jlfalse_var = global_to_llvm("jl_false", (void*)&jl_false, m);
     jlemptysvec_var = global_to_llvm("jl_emptysvec", (void*)&jl_emptysvec, m);
+    jlemptytuple_var = global_to_llvm("jl_emptytuple", (void*)&jl_emptytuple, m);
     jlexc_var = global_to_llvm("jl_exception_in_transit",
                                (void*)&jl_exception_in_transit, m);
     jldiverr_var = global_to_llvm("jl_diverror_exception",

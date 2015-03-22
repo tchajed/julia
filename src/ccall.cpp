@@ -607,7 +607,7 @@ static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
     }
 
     JL_TYPECHK(llvmcall, type, rt);
-    JL_TYPECHK(llvmcall, svec, at);
+    JL_TYPECHK(llvmcall, simplevector, at);
     //JL_TYPECHK(llvmcall, type, at);
 
     std::stringstream ir_stream;
@@ -849,11 +849,6 @@ static std::string generate_func_sig(Type **lrt, Type **prt, int &sret,
 #endif
         jl_value_t *tti = jl_svecref(tt,i);
 
-        if (jl_is_vararg_type(tti)) {
-            current_isVa = true;
-            tti = jl_tparam0(tti);
-        }
-
         Type *t = NULL;
         if (jl_is_abstract_ref_type(tti)) {
             if (jl_is_typevar(jl_tparam0(tti)))
@@ -1072,7 +1067,7 @@ static Value *emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
         }
     }
 
-    JL_TYPECHK(ccall, svec, at);
+    JL_TYPECHK(ccall, simplevector, at);
     //JL_TYPECHK(ccall, type, at);
     jl_svec_t *tt = (jl_svec_t*)at;
 
@@ -1108,9 +1103,6 @@ static Value *emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
             JL_GC_POP();
             emit_error("ccall: argument type Ptr should have an element type, Ptr{T}",ctx);
             return literal_pointer_val(jl_nothing);
-        }
-        if (jl_is_vararg_type(tti)) {
-            isVa = true;
         }
     }
 
