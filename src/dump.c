@@ -788,7 +788,7 @@ static void jl_serialize_methtable_from_mod(ios_t *s, jl_module_t *m, jl_sym_t *
         struct _chain *next;
     } *chain = NULL;
     jl_methlist_t *ml = mt->defs;
-    while (ml != jl_nothing) {
+    while (ml != (void*)jl_nothing) {
         if (jl_is_submodule(ml->func->linfo->module, jl_current_module)) {
             struct _chain *link = (struct _chain*)alloca(sizeof(struct _chain));
             link->ml = ml;
@@ -1752,24 +1752,24 @@ jl_module_t *jl_restore_new_module(const char *fname)
         jl_methtable_t *mt = (jl_methtable_t*)methtable_list.items[i];
         jl_array_t *cache_targ = mt->cache_targ;
         jl_array_t *cache_arg1 = mt->cache_arg1;
-        mt->cache_targ = (jl_array_t*)jl_nothing;
-        mt->cache_arg1 = (jl_array_t*)jl_nothing;
-        if (cache_targ != jl_nothing) {
+        mt->cache_targ = (void*)jl_nothing;
+        mt->cache_arg1 = (void*)jl_nothing;
+        if (cache_targ != (void*)jl_nothing) {
             size_t j, l = jl_array_len(cache_targ);
             for (j = 0; j < l; j++) {
                 jl_methlist_t *ml = (jl_methlist_t*)jl_cellref(cache_targ, j);
-                while (ml != NULL && ml != jl_nothing) {
+                while (ml != NULL && ml != (void*)jl_nothing) {
                     assert(!ml->isstaged);
                     jl_method_cache_insert(mt, ml->sig, ml->func);
                     ml = ml->next;
                 }
             }
         }
-        if (cache_arg1 != jl_nothing) {
+        if (cache_arg1 != (void*)jl_nothing) {
             size_t j, l = jl_array_len(cache_arg1);
             for (j = 0; j < l; j++) {
                 jl_methlist_t *ml = (jl_methlist_t*)jl_cellref(cache_arg1, j);
-                while (ml != NULL && ml != jl_nothing) {
+                while (ml != NULL && ml != (void*)jl_nothing) {
                     assert(!ml->isstaged);
                     jl_method_cache_insert(mt, ml->sig, ml->func);
                     ml = ml->next;

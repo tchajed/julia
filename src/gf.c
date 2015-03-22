@@ -1893,7 +1893,7 @@ static jl_value_t *ml_matches(jl_methlist_t *ml, jl_value_t *type,
                 // the "limited" mode used by type inference.
                 size_t l = jl_array_len(t);
                 for(i=0; i < l; i++) {
-                    jl_value_t *prior_ti = jl_t0(jl_cellref(t,i));
+                    jl_value_t *prior_ti = jl_tparam0(jl_cellref(t,i));
                     if (jl_is_leaf_type(prior_ti) && jl_subtype(ti, prior_ti, 0)) {
                         skip = 1;
                         break;
@@ -1945,7 +1945,7 @@ static jl_value_t *ml_matches(jl_methlist_t *ml, jl_value_t *type,
                 // (type ∩ ml->sig == type) ⇒ (type ⊆ ml->sig)
                 // NOTE: jl_subtype check added in case the intersection is
                 // over-approximated.
-                if (matched_all_typevars && jl_types_equal(jl_t0(matc), type) &&
+                if (matched_all_typevars && jl_types_equal(jl_svecref(matc,0), type) &&
                     jl_subtype(type, (jl_value_t*)ml->sig, 0)) {
                     JL_GC_POP();
                     return (jl_value_t*)t;
