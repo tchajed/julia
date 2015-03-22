@@ -655,14 +655,14 @@ void print_func_loc(JL_STREAM *s, jl_lambda_info_t *li);
 
 DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t *bp_owner,
                                     jl_binding_t *bnd,
-                                    jl_svec_t *argtypes, jl_function_t *f, jl_value_t *isstaged,
+                                    jl_svec_t *argdata, jl_function_t *f, jl_value_t *isstaged,
                                     jl_value_t *call_func, int iskw)
 {
-    // argtypes is a tuple ((types...), (typevars...))
-    jl_tupletype_t *t = (jl_tupletype_t*)jl_svecref(argtypes,0);
-    argtypes = (jl_svec_t*)jl_svecref(argtypes,1);
+    // argdata is svec({types...}, svec(typevars...))
+    jl_tupletype_t *argtypes = (jl_tupletype_t*)jl_svecref(argdata,0);
+    jl_svec_t *tvars = (jl_svec_t*)jl_svecref(argdata,1);
     jl_value_t *gf=NULL;
-    JL_GC_PUSH3(&gf, &argtypes, &t);
+    JL_GC_PUSH3(&gf, &tvars, &argtypes);
 
     if (bnd && bnd->value != NULL && !bnd->constp) {
         jl_errorf("cannot define function %s; it already has a value", bnd->name->name);
@@ -675,22 +675,22 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
                 // DataType: define `call`, for backwards compat with outer constructors
                 if (call_func == NULL)
                     call_func = (jl_value_t*)jl_module_call_func(jl_current_module);
-                size_t na = jl_svec_len(argtypes);
+                size_t na = jl_nparams(argtypes);
                 jl_svec_t *newargtypes = jl_alloc_svec(1 + na);
                 JL_GC_PUSH1(&newargtypes);
                 size_t i=0;
                 if (iskw) {
                     assert(na > 0);
                     // for kw sorter, keep container argument first
-                    jl_svecset(newargtypes, 0, jl_svecref(argtypes, 0));
+                    jl_svecset(newargtypes, 0, jl_tparam(argtypes, 0));
                     i++;
                 }
                 jl_svecset(newargtypes, i, jl_wrap_Type(gf));
                 i++;
                 for(; i < na+1; i++) {
-                    jl_svecset(newargtypes, i, jl_svecref(argtypes, i-1));
+                    jl_svecset(newargtypes, i, jl_tparam(argtypes, i-1));
                 }
-                argtypes = newargtypes;
+                argtypes = jl_apply_tuple_type(newargtypes, argtypes->va);
                 JL_GC_POP();
                 gf = call_func;
                 name = call_sym;
@@ -726,6 +726,8 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
         }
     }
 
+    // TODO
+    /*
     size_t na = jl_svec_len(argtypes);
     for(size_t i=0; i < na; i++) {
         jl_value_t *elt = jl_svecref(argtypes,i);
@@ -735,10 +737,11 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
                           jl_lam_argname(li,i)->name, name->name, li->file->name, li->line);
         }
     }
+    */
 
     int ishidden = !!strchr(name->name, '#');
-    for(size_t i=0; i < jl_datatype_nfields(t); i++) {
-        jl_value_t *tv = jl_field_type(t,i);
+    for(size_t i=0; i < jl_svec_len(tvars); i++) {
+        jl_value_t *tv = jl_svecref(tvars,i);
         if (!jl_is_typevar(tv))
             jl_type_error_rt(name->name, "method definition", (jl_value_t*)jl_tvar_type, tv);
         if (!ishidden && !type_contains((jl_value_t*)argtypes, tv)) {
@@ -758,10 +761,10 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
         if (bp_owner) gc_wb(bp_owner, gf);
     }
     assert(jl_is_function(f));
-    assert(jl_is_tuple(argtypes));
-    assert(jl_is_tuple_type(t));
+    assert(jl_is_tuple_type(argtypes));
+    assert(jl_is_svec(tvars));
 
-    jl_add_method((jl_function_t*)gf, t, f, argtypes, isstaged == jl_true);
+    jl_add_method((jl_function_t*)gf, argtypes, f, tvars, isstaged == jl_true);
     if (jl_boot_file_loaded &&
         f->linfo && f->linfo->ast && jl_is_expr(f->linfo->ast)) {
         jl_lambda_info_t *li = f->linfo;

@@ -525,7 +525,7 @@ void jl_compute_field_offsets(jl_datatype_t *st)
     int ptrfree = 1;
 
     for(size_t i=0; i < jl_datatype_nfields(st); i++) {
-        jl_value_t *ty = jl_field_type(st->types, i);
+        jl_value_t *ty = jl_field_type(st, i);
         size_t fsz, al;
         if (jl_isbits(ty) && jl_is_leaf_type(ty)) {
             fsz = jl_datatype_size(ty);
@@ -584,8 +584,6 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
     if(super != NULL) gc_wb(t, t->super);
     t->parameters = parameters;
     gc_wb(t, t->parameters);
-    t->name->names = fnames;
-    gc_wb(t, t->name->names);
     t->types = ftypes;
     if(ftypes != NULL) gc_wb(t, t->types);
     t->abstract = abstract;
@@ -607,6 +605,8 @@ jl_datatype_t *jl_new_datatype(jl_sym_t *name, jl_datatype_t *super,
         t->name = tn;
         gc_wb(t, t->name);
     }
+    t->name->names = fnames;
+    gc_wb(t->name, t->name->names);
 
     if (t->name->primary == NULL) {
         t->name->primary = (jl_value_t*)t;

@@ -910,9 +910,9 @@
      (if (null? params)
          `(block
            (global ,name) (const ,name)
-           (composite_type ,name (tuple ,@params)
-                           (tuple ,@(map (lambda (x) `',x) field-names))
-                           ,super (tuple ,@field-types) ,mut ,min-initialized)
+           (composite_type ,name (call (top svec) ,@params)
+                           (call (top svec) ,@(map (lambda (x) `',x) field-names))
+                           ,super (call (top svec) ,@field-types) ,mut ,min-initialized)
            (call
             (lambda ()
               (scope-block
@@ -929,9 +929,9 @@
              (global ,name) (const ,name)
              ,@(map (lambda (v) `(local ,v)) params)
              ,@(map make-assignment params (symbols->typevars params bounds #t))
-             (composite_type ,name (tuple ,@params)
-                             (tuple ,@(map (lambda (x) `',x) field-names))
-                             ,super (tuple ,@field-types) ,mut ,min-initialized)))
+             (composite_type ,name (call (top svec) ,@params)
+                             (call (top svec) ,@(map (lambda (x) `',x) field-names))
+                             ,super (call (top svec) ,@field-types) ,mut ,min-initialized)))
            ;; "inner" constructors
            (call
             (lambda ()
@@ -965,7 +965,7 @@
      (const ,name)
      ,@(map (lambda (v) `(local ,v)) params)
      ,@(map make-assignment params (symbols->typevars params bounds #f))
-     (abstract_type ,name (tuple ,@params) ,super))))
+     (abstract_type ,name (call (top svec) ,@params) ,super))))
 
 (define (bits-def-expr n name params super)
   (receive
@@ -975,7 +975,7 @@
      (const ,name)
      ,@(map (lambda (v) `(local ,v)) params)
      ,@(map make-assignment params (symbols->typevars params bounds #f))
-     (bits_type ,name (tuple ,@params) ,n ,super))))
+     (bits_type ,name (call (top svec) ,@params) ,n ,super))))
 
 ; take apart a type signature, e.g. T{X} <: S{Y}
 (define (analyze-type-sig ex)
