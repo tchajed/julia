@@ -975,7 +975,7 @@ DLLEXPORT jl_function_t *jl_instantiate_staged(jl_methlist_t *m, jl_tupletype_t 
             assert(((jl_expr_t*)arg)->head == colons_sym);
             arg = jl_cellref(((jl_expr_t*)arg)->args,0);
             assert(jl_is_symbol(arg));
-            jl_expr_t *dd_expr = jl_exprn(ldots_sym,1);
+            jl_expr_t *dd_expr = jl_exprn(dots_sym,1);
             jl_cellset(dd_expr->args,0,arg);
             jl_cellset(argnames->args,i,dd_expr);
         }

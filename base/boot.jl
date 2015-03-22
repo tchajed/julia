@@ -23,6 +23,7 @@
 #    ctor
 #    instance
 #    size::Int32
+#    va::Bool
 #    abstract::Bool
 #    mutable::Bool
 #    pointerfree::Bool
@@ -118,9 +119,9 @@ import Core.Intrinsics.ccall
 
 export
     # key types
-    Any, DataType, Vararg, ANY, NTuple,
+    Any, DataType, ANY, NTuple,
     Tuple, Type, TypeConstructor, TypeName, TypeVar, Union, UnionType, Void,
-    AbstractArray, DenseArray,
+    SimpleVector, AbstractArray, DenseArray,
     # special objects
     Box, Function, IntrinsicFunction, LambdaStaticData, Method, MethodTable,
     Module, Symbol, Task, Array, GenSym,
@@ -140,7 +141,7 @@ export
     GlobalRef, NewvarNode,
     # object model functions
     fieldtype, getfield, setfield!, yieldto, throw, tuple, is, ===, isdefined,
-    # arraylen, arrayref, arrayset, arraysize, tuplelen, tupleref,
+    # arraylen, arrayref, arrayset, arraysize,
     # _apply, kwcall,
     # sizeof    # not exported, to avoid conflicting with Base.sizeof
     # type reflection

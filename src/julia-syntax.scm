@@ -384,9 +384,7 @@
                     (cons (replace-end (expand-index-colon idx) a n tuples last)
                           ret)))))))
 
-(define (make-decl n t) `(|::| ,n ,(if (and (pair? t) (eq? (car t) '...))
-                                       `(curly Vararg ,(cadr t))
-                                       t)))
+(define (make-decl n t) `(|::| ,n ,t))
 
 (define (function-expr argl body)
   (let ((t (llist-types argl))
@@ -468,10 +466,10 @@
      (let* ((types (llist-types argl))
             (body  (method-lambda-expr argl body)))
        (if (null? sparams)
-           `(method ,name (tuple (tuple ,@types) (tuple)) ,body ,isstaged)
+           `(method ,name (call (top svec) (curly Tuple ,@types) (call (top svec))) ,body ,isstaged)
            `(method ,name
                     (call (lambda ,names
-                            (tuple (tuple ,@types) (tuple ,@names)))
+                            (call (top svec) (curly Tuple ,@types) (call (top svec) ,@names)))
                           ,@(symbols->typevars names bounds #t))
                     ,body ,isstaged))))))
 
@@ -1744,7 +1742,11 @@
    'curly
    (lambda (e)
      (expand-forms
-      `(call (top apply_type) ,@(cdr e))))
+      (if (and (length> e 1) (eq? (cadr e) 'Tuple))
+	  (if (and (length> e 2) (vararg? (last e)))
+	      `(call (top apply_type) Tuple true  ,@(butlast (cddr e)) ,(cadr (last e)))
+	      `(call (top apply_type) Tuple false ,@(cddr e)))
+	  `(call (top apply_type) ,@(cdr e)))))
 
    'call
    (lambda (e)
@@ -1807,11 +1809,8 @@
                      ;; assignment inside tuple looks like a keyword argument
                      (if (assignment? x)
                          (error "assignment not allowed inside tuple"))
-                     (expand-forms
-                      (if (vararg? x)
-                          `(curly Vararg ,(cadr x))
-                          x)))
-                   (cdr e))))
+                     (expand-forms x))
+		   (cdr e))))
 
    'dict
    (lambda (e)

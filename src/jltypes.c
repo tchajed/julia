@@ -1893,26 +1893,35 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     return result;
 }
 
-DLLEXPORT jl_tupletype_t *jl_apply_tuple_type(jl_svec_t *params, int va)
+static jl_tupletype_t *jl_apply_tuple_type_v_(jl_value_t **p, size_t np, int va, jl_svec_t *params)
 {
-    size_t l = jl_svec_len(params);
     int isabstract = va;
     if (!va) {
-        for(size_t i=0; i < l; i++) {
-            if (!jl_is_leaf_type(jl_svecref(params,i))) {
+        for(size_t i=0; i < np; i++) {
+            if (!jl_is_leaf_type(p[i])) {
                 isabstract = 1; break;
             }
         }
     }
-    jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, jl_svec_data(params), l,
+    jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, p, np,
                                                        !isabstract, isabstract, NULL, NULL, 0);
     if (va) ndt->va = 1;
     return ndt;
 }
 
-jl_datatype_t *jl_inst_concrete_datatype(jl_datatype_t *dt, jl_value_t **p, size_t np)
+DLLEXPORT jl_tupletype_t *jl_apply_tuple_type(jl_svec_t *params, int va)
 {
-    return (jl_datatype_t*)inst_datatype(dt, NULL, p, np, 1, 0, NULL, NULL, 0);
+    return jl_apply_tuple_type_v_(jl_svec_data(params), jl_svec_len(params), va, params);
+}
+
+DLLEXPORT jl_tupletype_t *jl_apply_tuple_type_v(jl_value_t **p, size_t np, int va)
+{
+    return jl_apply_tuple_type_v_(p, np, va, NULL);
+}
+
+jl_datatype_t *jl_inst_concrete_tupletype(jl_value_t **p, size_t np)
+{
+    return (jl_datatype_t*)inst_datatype(jl_anytuple_type, NULL, p, np, 1, 0, NULL, NULL, 0);
 }
 
 static jl_svec_t *inst_all(jl_svec_t *p, jl_value_t **env, size_t n,
@@ -2878,17 +2887,18 @@ void jl_init_types(void)
     jl_datatype_type->name->names = jl_svec(10, jl_symbol("name"),
                                             jl_symbol("super"),
                                             jl_symbol("parameters"),
-                                            jl_symbol("names"),
                                             jl_symbol("types"),
                                             jl_symbol("instance"),
                                             jl_symbol("size"),
+                                            jl_symbol("va"),
                                             jl_symbol("abstract"),
                                             jl_symbol("mutable"),
                                             jl_symbol("pointerfree"));
     jl_datatype_type->types = jl_svec(10, jl_typename_type, jl_type_type,
                                       jl_simplevector_type, jl_simplevector_type,
-                                      jl_simplevector_type, jl_any_type,
-                                      jl_any_type, //types will be fixed later
+                                      jl_any_type,
+                                      jl_any_type, // size
+                                      jl_any_type, // va
                                       jl_any_type, jl_any_type, jl_any_type);
     jl_datatype_type->instance = NULL;
     jl_datatype_type->va = 0;
@@ -3189,11 +3199,11 @@ void jl_init_types(void)
     jl_value_t *pointer_void = jl_apply_type((jl_value_t*)jl_pointer_type,
                                              jl_svec1(jl_void_type));
     jl_voidpointer_type = (jl_datatype_t*)pointer_void;
-    jl_svecset(jl_datatype_type->types, 6, jl_int32_type);
+    jl_svecset(jl_datatype_type->types, 5, jl_int32_type);
+    jl_svecset(jl_datatype_type->types, 6, (jl_value_t*)jl_bool_type);
     jl_svecset(jl_datatype_type->types, 7, (jl_value_t*)jl_bool_type);
     jl_svecset(jl_datatype_type->types, 8, (jl_value_t*)jl_bool_type);
     jl_svecset(jl_datatype_type->types, 9, (jl_value_t*)jl_bool_type);
-    //jl_svecset(jl_datatype_type->types, 10, jl_int32_type);
     jl_svecset(jl_function_type->types, 0, pointer_void);
     jl_svecset(jl_tvar_type->types, 3, (jl_value_t*)jl_bool_type);
     jl_svecset(jl_simplevector_type->types, 0, jl_long_type);
@@ -3222,7 +3232,6 @@ void jl_init_types(void)
     quote_sym = jl_symbol("quote");
     inert_sym = jl_symbol("inert");
     top_sym = jl_symbol("top");
-    dots_sym = jl_symbol("Vararg");
     line_sym = jl_symbol("line");
     jl_incomplete_sym = jl_symbol("incomplete");
     error_sym = jl_symbol("error");
@@ -3268,7 +3277,7 @@ void jl_init_types(void)
     simdloop_sym = jl_symbol("simdloop");
     meta_sym = jl_symbol("meta");
     arrow_sym = jl_symbol("->");
-    ldots_sym = jl_symbol("...");
+    dots_sym = jl_symbol("...");
 }
 
 #ifdef __cplusplus

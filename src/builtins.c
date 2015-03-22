@@ -620,7 +620,7 @@ JL_CALLABLE(jl_f_tuple)
     for(i=0; i < nargs; i++) {
         types[i] = jl_typeof(args[i]);
     }
-    jl_datatype_t *tt = jl_inst_concrete_datatype(jl_anytuple_type, types, nargs);
+    jl_datatype_t *tt = jl_inst_concrete_tupletype(types, nargs);
     return jl_new_structv(tt, args, nargs);
 }
 
@@ -1009,6 +1009,9 @@ JL_CALLABLE(jl_f_instantiate_type)
     JL_NARGSV(instantiate_type, 1);
     if (!jl_is_datatype(args[0]))
         JL_TYPECHK(instantiate_type, typector, args[0]);
+    if (args[0] == jl_anytuple_type) {
+        return jl_apply_tuple_type_v(&args[2], nargs-2, args[1]!=jl_false);
+    }
     return jl_apply_type_(args[0], &args[1], nargs-1);
 }
 

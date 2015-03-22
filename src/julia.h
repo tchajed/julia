@@ -448,8 +448,7 @@ extern jl_sym_t *global_sym;  extern jl_sym_t *tuple_sym;
 extern jl_sym_t *boundscheck_sym; extern jl_sym_t *copyast_sym;
 extern jl_sym_t *fastmath_sym;
 extern jl_sym_t *simdloop_sym; extern jl_sym_t *meta_sym;
-extern jl_sym_t *arrow_sym; extern jl_sym_t *ldots_sym;
-extern jl_sym_t *inert_sym;
+extern jl_sym_t *arrow_sym; extern jl_sym_t *inert_sym;
 
 
 // GC write barrier
@@ -742,6 +741,7 @@ DLLEXPORT jl_tvar_t *jl_new_typevar(jl_sym_t *name,jl_value_t *lb,jl_value_t *ub
 jl_typector_t *jl_new_type_ctor(jl_svec_t *params, jl_value_t *body);
 DLLEXPORT jl_value_t *jl_apply_type(jl_value_t *tc, jl_svec_t *params);
 DLLEXPORT jl_tupletype_t *jl_apply_tuple_type(jl_svec_t *params, int va);
+DLLEXPORT jl_tupletype_t *jl_apply_tuple_type_v(jl_value_t **p, size_t np, int va);
 jl_value_t *jl_apply_type_(jl_value_t *tc, jl_value_t **params, size_t n);
 jl_value_t *jl_instantiate_type_with(jl_value_t *t, jl_value_t **env, size_t n);
 DLLEXPORT jl_uniontype_t *jl_new_uniontype(jl_svec_t *types);
