@@ -1196,7 +1196,7 @@ static Value *mark_type_at_dynamic_idx(Value *v, Value *ival0, Value *nb, jl_dat
 {
     if (sizeof(void*) != 4)
         ival0 = builder.CreateZExt(ival0,T_size);
-    if (is_tupletype_homogeneous((jl_tuple_t*)jt)) {
+    if (is_tupletype_homogeneous(jt)) {
         return mark_julia_type(v, jl_field_type(jdt, 0));
     }
     else {

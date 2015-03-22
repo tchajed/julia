@@ -489,12 +489,6 @@ static inline void gc_wb_back(void *ptr) // ptr isa jl_value_t*
 
 // object accessors -----------------------------------------------------------
 
-#ifdef OVERLAP_SVEC_LEN
-#define jl_typeof(v) ((jl_value_t*)((uptrint_t)((jl_value_t*)(v))->type & 0x000ffffffffffffeULL))
-#else
-#define jl_typeof(v) ((jl_value_t*)((uptrint_t)((jl_value_t*)(v))->type & ((uintptr_t)~3)))
-#endif
-
 #define jl_typeis(v,t) (jl_typeof(v)==(jl_value_t*)(t))
 
 #define jl_svec_len(t)              (((jl_svec_t*)(t))->length)
@@ -513,9 +507,6 @@ STATIC_INLINE jl_value_t *jl_svecset(void *t, size_t i, void *x)
     if (x) gc_wb(t, x);
     return (jl_value_t*)x;
 }
-
-#define jl_svec0(t) jl_svecref(t,0)
-#define jl_svec1(t) jl_svecref(t,1)
 
 #ifdef STORE_ARRAY_LEN
 #define jl_array_len(a)   (((jl_array_t*)(a))->length)
@@ -707,9 +698,9 @@ STATIC_INLINE int jl_is_tuple_type(void *t)
             ((jl_datatype_t*)(t))->name == jl_tuple_typename);
 }
 
-STATIC_INLINE int jl_is_va(void *)
+STATIC_INLINE int jl_is_va(void *t)
 {
-    return (jl_is_datatype(t) && ((jl_datatype_t*)(t))->isVa);
+    return (jl_is_datatype(t) && ((jl_datatype_t*)(t))->va);
 }
 
 STATIC_INLINE int jl_is_ntuple_type(jl_value_t *v)

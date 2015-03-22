@@ -143,7 +143,7 @@ jl_array_t *jl_new_array_for_deserialization(jl_value_t *atype, uint32_t ndims, 
     return _new_array_(atype, ndims, dims, isunboxed, elsz);
 }
 
-jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data, jl_tuple_t *dims)
+jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data, jl_value_t *dims)
 {
     size_t i;
     jl_array_t *a;
@@ -246,7 +246,7 @@ jl_array_t *jl_ptr_to_array_1d(jl_value_t *atype, void *data, size_t nel,
     return a;
 }
 
-jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_tuple_t *dims,
+jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_value_t *dims,
                             int own_buffer)
 {
     size_t i, elsz, nel=1;
@@ -305,7 +305,7 @@ jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data, jl_tuple_t *dims,
     return a;
 }
 
-jl_array_t *jl_new_array(jl_value_t *atype, jl_tuple_t *dims)
+jl_array_t *jl_new_array(jl_value_t *atype, jl_value_t *dims)
 {
     size_t ndims = jl_nfields(dims);
     size_t *adims = (size_t*)alloca(ndims*sizeof(size_t));

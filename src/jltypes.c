@@ -26,7 +26,7 @@ jl_datatype_t *jl_symbol_type;
 jl_datatype_t *jl_gensym_type;
 jl_datatype_t *jl_simplevector_type;
 jl_typename_t *jl_tuple_typename;
-jl_tuple_t *jl_anytuple_type;
+jl_tupletype_t *jl_anytuple_type;
 jl_datatype_t *jl_ntuple_type;
 jl_typename_t *jl_ntuple_typename;
 jl_datatype_t *jl_tvar_type;
@@ -55,7 +55,7 @@ jl_datatype_t *jl_complex_type;
 jl_datatype_t *jl_signed_type;
 
 jl_value_t *jl_emptytuple;
-jl_value_t *jl_emptysvec;
+jl_svec_t *jl_emptysvec;
 jl_value_t *jl_nothing;
 
 // --- type properties and predicates ---
@@ -284,7 +284,7 @@ typedef enum {invariant, covariant} variance_t;
 typedef struct {
     jl_value_t **data;
     size_t n;
-    jl_tuple_t *tvars;
+    jl_svec_t *tvars;
 } cenv_t;
 
 STATIC_INLINE int is_bnd(jl_tvar_t *tv, cenv_t *env)
@@ -606,7 +606,7 @@ static jl_value_t *type_to_static_parameter_value(jl_value_t *t)
         jl_svec_t *p = ((jl_datatype_t*)t)->parameters;
         size_t l = jl_svec_len(p);
         int changed = 0;
-        jl_tuple_t *np = jl_alloc_svec(l);
+        jl_svec_t *np = jl_alloc_svec(l);
         JL_GC_PUSH1(&np);
         for(size_t i=0; i < l; i++) {
             jl_value_t *el = type_to_static_parameter_value(jl_svecref(p,i));
@@ -2727,7 +2727,7 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
             }
             jl_value_t *p_seq = jl_apply_tuple_type(jl_svecref(tp,1), 1);
             JL_GC_PUSH1(&p_seq);
-            tmp = tuple_match((jl_tuple_t*)child, (jl_tuple_t*)p_seq,
+            tmp = tuple_match((jl_tupletype_t*)child, (jl_tupletype_t*)p_seq,
                               env, morespecific, invariant);
             JL_GC_POP();
             return tmp;

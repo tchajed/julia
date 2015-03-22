@@ -114,8 +114,8 @@ int32_t jl_get_llvm_gv(jl_value_t *p);
 DLLEXPORT void jl_read_sonames(void);
 #endif
 
-jl_lambda_info_t *jl_add_static_parameters(jl_lambda_info_t *l, jl_tuple_t *sp);
-jl_function_t *jl_get_specialization(jl_function_t *f, jl_tuple_t *types);
+jl_lambda_info_t *jl_add_static_parameters(jl_lambda_info_t *l, jl_svec_t *sp);
+jl_function_t *jl_get_specialization(jl_function_t *f, jl_tupletype_t *types);
 jl_function_t *jl_module_get_initializer(jl_module_t *m);
 void jl_generate_fptr(jl_function_t *f);
 void jl_fptr_to_llvm(void *fptr, jl_lambda_info_t *lam, int specsig);

@@ -1001,7 +1001,7 @@ static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_datatype_t *tt,
     size_t nargs = jl_nparams(tt);
     size_t i;
     jl_value_t *ti=(jl_value_t*)jl_bottom_type;
-    jl_tuple_t *newsig=NULL, *env = jl_null;
+    jl_tupletype_t *newsig=NULL, *env = jl_null;
     jl_function_t *func = NULL;
     JL_GC_PUSH3(&env, &newsig, &func);
 
@@ -1044,7 +1044,7 @@ static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_datatype_t *tt,
             JL_GC_POP();
             if (!cache)
                 return func;
-            return cache_method(mt, tt, func, (jl_tuple_t*)m->sig, jl_null, m->isstaged);
+            return cache_method(mt, tt, func, m->sig, jl_null, m->isstaged);
         }
         JL_GC_POP();
         return jl_bottom_func;
@@ -1062,12 +1062,12 @@ static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_datatype_t *tt,
             break;
     }
     if (i < jl_tuple_len(tt)) {
-        newsig = (jl_tuple_t*)jl_instantiate_type_with((jl_value_t*)m->sig,
+        newsig = (jl_tupletype_t*)jl_instantiate_type_with((jl_value_t*)m->sig,
                                                        jl_tuple_data(env),
                                                        jl_tuple_len(env)/2);
     }
     else {
-        newsig = (jl_tuple_t*)m->sig;
+        newsig = m->sig;
     }
     assert(jl_is_tuple(newsig));
     jl_function_t *nf;
