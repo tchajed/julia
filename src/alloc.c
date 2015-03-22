@@ -114,12 +114,12 @@ static jl_value_t *jl_new_bits_internal(jl_value_t *dt, void *data, size_t *len)
     if (jl_is_ntuple_type(dt)) {
         jl_value_t *lenvar = jl_tparam0(dt);
         jl_value_t *elty = jl_tparam1(dt);
-        size_t alignment = jl_new_bits_align(elty)
-        *len = LLT_ALIGN(*len, alignment);
+        size_t alignment = jl_new_bits_align(elty);
+        *len = LLT_ALIGN((*len), alignment);
         assert(jl_is_long(lenvar));
-        size_t i, l = jl_unbox_long(lenvar);
+        size_t l = jl_unbox_long(lenvar);
         size_t nb = l*LLT_ALIGN(jl_datatype_size(elty), alignment);
-        jl_value_t *v = (jl_value_t*)newobj((jl_value_t*)bt, NWORDS(nb));
+        jl_value_t *v = (jl_value_t*)newobj(dt, NWORDS(nb));
         memcpy(jl_data_ptr(v), data, nb);
         return v;
     }
@@ -501,7 +501,7 @@ jl_typename_t *jl_new_typename(jl_sym_t *name)
     tn->name = name;
     tn->module = jl_current_module;
     tn->primary = NULL;
-    tn->cache = jl_emptysvec;
+    tn->cache = (jl_value_t*)jl_emptysvec;
     return tn;
 }
 
