@@ -119,7 +119,7 @@ static inline int cache_match(jl_value_t **args, size_t n, jl_tupletype_t *sig,
             jl_datatype_t *ta = (jl_datatype_t*)jl_typeof(a);
             if (!jl_is_tuple_type(ta) || //!jl_subtype(a, decl, 1))
                 !jl_tuple_subtype(jl_svec_data(ta->parameters), jl_datatype_nfields(ta), ta->va,
-                                  decl, 1))
+                                  (jl_datatype_t*)decl, 1))
                 return 0;
         }
         else if (jl_is_type_type(decl) && jl_is_type(a)) {
@@ -146,7 +146,7 @@ jl_methlist_t *mtcache_hash_lookup(jl_array_t *a, jl_value_t *ty, int tparam)
 {
     uptrint_t uid = ((jl_datatype_t*)ty)->uid;
     jl_methlist_t *ml = (jl_methlist_t*)jl_cellref(a, uid & (a->nrows-1));
-    if (ml && ml!=jl_nothing) {
+    if (ml && ml!=(void*)jl_nothing) {
         jl_value_t *t = jl_field_type(ml->sig, 0);
         if (tparam) t = jl_tparam0(t);
         if (t == ty)
@@ -210,7 +210,7 @@ static jl_function_t *jl_method_table_assoc_exact_by_type(jl_methtable_t *mt, jl
         jl_value_t *ty = jl_tparam0(types);
         if (jl_is_type_type(ty)) {
             jl_value_t *a0 = jl_tparam0(ty);
-            if (mt->cache_targ != jl_nothing && jl_is_datatype(a0)) {
+            if (mt->cache_targ != (void*)jl_nothing && jl_is_datatype(a0)) {
                 ml = mtcache_hash_lookup(mt->cache_targ, a0, 1);
                 if (ml!=(jl_methlist_t*)jl_nothing)
                     goto mt_assoc_bt_lkup;
@@ -410,7 +410,7 @@ void jl_type_infer(jl_lambda_info_t *li, jl_tupletype_t *argtypes, jl_lambda_inf
 #endif
 #ifdef ENABLE_INFERENCE
         jl_value_t *newast = jl_apply(jl_typeinf_func, fargs, 4);
-        li->ast = jl_tupleref(newast, 0);
+        li->ast = jl_fieldref(newast, 0);
         gc_wb(li, li->ast);
         li->inferred = 1;
 #endif
@@ -481,6 +481,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
     jl_function_t *newmeth=NULL;
     jl_svec_t *newparams=NULL;
     jl_svec_t *limited=NULL;
+    jl_tupletype_t *origtype = type;  // TODO: root?
     JL_GC_PUSH5(&temp, &temp2, &newmeth, &newparams, &limited);
     size_t np = jl_nparams(type);
     newparams = jl_svec_copy(type->parameters);
@@ -522,8 +523,8 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
             // don't specialize on slots marked ANY
             temp = jl_tparam(type, i);
             jl_svecset(newparams, i, (jl_value_t*)jl_any_type);
-            temp2 = jl_svec_copy(newparams);
-            temp2 = jl_apply_tuple_type(temp2, type->va);
+            temp2 = (jl_value_t*)jl_svec_copy(newparams);
+            temp2 = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)temp2, type->va);
             int nintr=0;
             jl_methlist_t *curr = mt->defs;
             // if this method is the only match even with the current slot
@@ -653,7 +654,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
             int ok=1, kindslot=0;
             jl_methlist_t *curr = mt->defs;
             jl_value_t *kind = (jl_value_t*)jl_typeof(jl_tparam0(elt));
-            while (curr != jl_nothing) {
+            while (curr != (void*)jl_nothing) {
                 jl_value_t *slottype = nth_slot_type(curr->sig, i);
                 if (slottype && curr->func!=method) {
                     if (slottype == kind) {
@@ -671,7 +672,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
                 }
                 else {
                     curr = mt->defs;
-                    while (curr != jl_nothing) {
+                    while (curr != (void*)jl_nothing) {
                         jl_value_t *slottype = nth_slot_type(curr->sig, i);
                         if (slottype && curr->func!=method) {
                             if (!very_general_type(slottype) &&
@@ -1058,9 +1059,9 @@ static jl_function_t *jl_mt_assoc_by_type(jl_methtable_t *mt, jl_datatype_t *tt,
             break;
     }
     if (i < jl_nparams(tt)) {
-        newsig = jl_instantiate_type_with((jl_value_t*)m->sig,
-                                          jl_svec_data(env),
-                                          jl_svec_len(env)/2);
+        newsig = (jl_tupletype_t*)jl_instantiate_type_with((jl_value_t*)m->sig,
+                                                           jl_svec_data(env),
+                                                           jl_svec_len(env)/2);
     }
     else {
         newsig = m->sig;
@@ -1588,7 +1589,7 @@ void jl_compile_all(void)
     _compile_all(jl_main_module, &h);
 }
 
-DLLEXPORT void jl_compile_hint(jl_function_t *f, jl_tupletype_t_t *types)
+DLLEXPORT void jl_compile_hint(jl_function_t *f, jl_tupletype_t *types)
 {
     (void)jl_get_specialization(f, types);
 }
@@ -1764,9 +1765,9 @@ jl_value_t *jl_gf_invoke(jl_function_t *gf, jl_tupletype_t *types,
                     break;
             }
             if (i < jl_nparams(tt)) {
-                newsig = jl_instantiate_type_with((jl_value_t*)m->sig,
-                                                  jl_svec_data(tpenv),
-                                                  jl_svec_len(tpenv)/2);
+                newsig = (jl_tupletype_t*)jl_instantiate_type_with((jl_value_t*)m->sig,
+                                                                   jl_svec_data(tpenv),
+                                                                   jl_svec_len(tpenv)/2);
             }
         }
         mfunc = cache_method(m->invokes, tt, m->func, newsig, tpenv, m->isstaged);
