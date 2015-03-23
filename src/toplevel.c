@@ -204,7 +204,9 @@ static int is_intrinsic(jl_module_t *m, jl_sym_t *s)
 // - later, it refers to either old Base or new Base
 jl_module_t *jl_base_relative_to(jl_module_t *m)
 {
-    return (m==jl_core_module||m==jl_old_base_module||jl_base_module==NULL) ? m : jl_base_module;
+    if (m==jl_core_module || m==jl_old_base_module)
+        return m;
+    return (jl_base_module==NULL) ? jl_core_module : jl_base_module;
 }
 
 int jl_has_intrinsics(jl_expr_t *e)

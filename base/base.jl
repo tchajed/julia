@@ -267,6 +267,17 @@ Array{T}(::Type{T}, m::Integer)                       = Array{T}(m)
 Array{T}(::Type{T}, m::Integer,n::Integer)            = Array{T}(m,n)
 Array{T}(::Type{T}, m::Integer,n::Integer,o::Integer) = Array{T}(m,n,o)
 
+# SimpleVector
+
+length(v::SimpleVector) = v.length
+
+function getindex(v::SimpleVector, i::Int)
+    if !(1 <= i <= length(v))
+        throw(BoundsError())
+    end
+    unsafe_load(convert(Ptr{Any},data_pointer_from_objref(v)) + i*sizeof(Ptr))
+end
+
 immutable Nullable{T}
     isnull::Bool
     value::T

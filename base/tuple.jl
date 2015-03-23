@@ -1,10 +1,13 @@
 ## indexing ##
 
-length(t::Tuple) = tuplelen(t)
-endof(t::Tuple) = tuplelen(t)
-size(t::Tuple, d) = d==1 ? tuplelen(t) : throw(ArgumentError("invalid tuple dimension $d"))
-getindex(t::Tuple, i::Int) = tupleref(t, i)
-getindex(t::Tuple, i::Real) = tupleref(t, convert(Int, i))
+nfields(t::DataType) = length(t.types)
+nfields(v) = nfields(typeof(v))
+
+length(t::Tuple) = nfields(t)
+endof(t::Tuple) = length(t)
+size(t::Tuple, d) = d==1 ? length(t) : throw(ArgumentError("invalid tuple dimension $d"))
+getindex(t::Tuple, i::Int) = getfield(t, i)
+getindex(t::Tuple, i::Real) = getfield(t, convert(Int, i))
 getindex(t::Tuple, r::AbstractArray) = tuple([t[ri] for ri in r]...)
 getindex(t::Tuple, b::AbstractArray{Bool}) = getindex(t,find(b))
 

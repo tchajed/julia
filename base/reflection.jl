@@ -39,17 +39,7 @@ end
 
 fieldname(t::DataType, i::Integer) = t.names[i]
 
-nfields(t::DataType) = length(t.names)
-function nfields(v)
-    t = typeof(v)
-    if !isa(DataType)
-        throw(ArgumentError("cannot call nfields() on a non-composite type"))
-    end
-    return nfields(t)
-end
-
-isconst(s::Symbol) =
-    ccall(:jl_is_const, Int32, (Ptr{Void}, Any), C_NULL, s) != 0
+isconst(s::Symbol) = ccall(:jl_is_const, Int32, (Ptr{Void}, Any), C_NULL, s) != 0
 
 isconst(m::Module, s::Symbol) =
     ccall(:jl_is_const, Int32, (Any, Any), m, s) != 0
