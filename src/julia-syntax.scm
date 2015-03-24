@@ -448,6 +448,14 @@
            (pair? (caddr e)) (memq (car (caddr e)) '(quote inert))
            (symbol? (cadr (caddr e))))))
 
+(define (va->dots arglist)
+  (if (length> arglist 0)
+      (let ((l (last arglist)))
+	(if (vararg? l)
+	    `(,@(butlast arglist) ,(cadr l) ...)
+	    arglist))
+      arglist))
+
 (define (method-def-expr- name sparams argl body isstaged)
   (receive
    (names bounds) (sparam-name-bounds sparams '() '())
@@ -466,10 +474,11 @@
      (let* ((types (llist-types argl))
             (body  (method-lambda-expr argl body)))
        (if (null? sparams)
-           `(method ,name (call (top svec) (curly Tuple ,@types) (call (top svec))) ,body ,isstaged)
+           `(method ,name (call (top svec) (curly Tuple ,@(va->dots types)) (call (top svec)))
+		    ,body ,isstaged)
            `(method ,name
                     (call (lambda ,names
-                            (call (top svec) (curly Tuple ,@types) (call (top svec) ,@names)))
+                            (call (top svec) (curly Tuple ,@(va->dots types)) (call (top svec) ,@names)))
                           ,@(symbols->typevars names bounds #t))
                     ,body ,isstaged))))))
 
@@ -1742,11 +1751,9 @@
    'curly
    (lambda (e)
      (expand-forms
-      (if (and (length> e 1) (eq? (cadr e) 'Tuple))
-	  (if (and (length> e 2) (vararg? (last e)))
-	      `(call (top apply_type) Tuple true  ,@(butlast (cddr e)) ,(cadr (last e)))
-	      `(call (top apply_type) Tuple false ,@(cddr e)))
-	  `(call (top apply_type) ,@(cdr e)))))
+      (if (and (length> e 2) (eq? (last e) '...))
+	  `(call (top apply_type) true  ,@(butlast (cdr e)))
+	  `(call (top apply_type) false ,@(cdr e)))))
 
    'call
    (lambda (e)
@@ -1804,13 +1811,12 @@
 
    'tuple
    (lambda (e)
-     `(call (top tuple)
-            ,.(map (lambda (x)
-                     ;; assignment inside tuple looks like a keyword argument
-                     (if (assignment? x)
-                         (error "assignment not allowed inside tuple"))
-                     (expand-forms x))
-		   (cdr e))))
+     (for-each (lambda (x)
+		 ;; assignment inside tuple looks like a keyword argument
+		 (if (assignment? x)
+		     (error "assignment not allowed inside tuple")))
+	       (cdr e))
+     (expand-forms `(call (top tuple) ,@(cdr e))))
 
    'dict
    (lambda (e)
@@ -1825,7 +1831,7 @@
            (args   (cddr e)))
        (if (and (length= atypes 3)
                 (eq? (car atypes) '=>))
-           `(call (call (top apply_type) (top Dict)
+           `(call (call (top apply_type) false (top Dict)
                         ,(expand-forms (cadr atypes))
                         ,(expand-forms (caddr atypes)))
                   ,.(map expand-forms args))

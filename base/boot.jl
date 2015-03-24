@@ -269,7 +269,7 @@ TypeConstructor(p::ANY, t::ANY) = ccall(:jl_new_type_constructor, Any, (Any, Any
 
 Expr(args::ANY...) = _expr(args...)
 
-_new(typ::Symbol, argty::Symbol) = eval(:(Core.call(::$(Expr(:call, :(Core.apply_type), :Type, typ)), n::$argty) = $(Expr(:new, typ, :n))))
+_new(typ::Symbol, argty::Symbol) = eval(:(Core.call(::Type{$typ}, n::$argty) = $(Expr(:new, typ, :n))))
 _new(:LineNumberNode, :Int)
 _new(:LabelNode, :Int)
 _new(:GotoNode, :Int)

@@ -1006,13 +1006,19 @@ JL_CALLABLE(jl_trampoline)
 
 JL_CALLABLE(jl_f_instantiate_type)
 {
-    JL_NARGSV(instantiate_type, 1);
-    if (!jl_is_datatype(args[0]))
-        JL_TYPECHK(instantiate_type, typector, args[0]);
-    if (args[0] == jl_anytuple_type) {
-        return jl_apply_tuple_type_v(&args[2], nargs-2, args[1]!=jl_false);
+    JL_NARGSV(instantiate_type, 2);
+    int va = args[0]!=jl_false;
+    if (!jl_is_datatype(args[1]))
+        JL_TYPECHK(instantiate_type, typector, args[1]);
+    if (args[1] == jl_anytuple_type) {
+        if (va && nargs <= 2)
+            jl_error("a variadic tuple type must have at least one parameter");
+        return jl_apply_tuple_type_v(&args[2], nargs-2, va);
     }
-    return jl_apply_type_(args[0], &args[1], nargs-1);
+    else if (va) {
+        jl_error("only tuple types can be variadic");
+    }
+    return jl_apply_type_(args[1], &args[2], nargs-2);
 }
 
 DLLEXPORT jl_value_t *jl_new_type_constructor(jl_svec_t *p, jl_value_t *t)
