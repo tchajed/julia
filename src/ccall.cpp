@@ -800,6 +800,9 @@ static std::string generate_func_sig(Type **lrt, Type **prt, int &sret,
         jl_value_t *rt, jl_svec_t *tt)
 {
     size_t nargt = jl_svec_len(tt);
+    if (nargt > 0 && jl_svecref(tt,nargt-1) == (jl_value_t*)dots_sym) {
+        nargt--;
+    }
     assert(rt && !jl_is_abstract_ref_type(rt));
 
 #if LLVM33
@@ -1097,6 +1100,10 @@ static Value *emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
     // some sanity checking and check whether there's a vararg
     size_t i;
     size_t nargt = jl_svec_len(tt);
+    if (nargt > 0 && jl_svecref(tt,nargt-1) == (jl_value_t*)dots_sym) {
+        isVa = true;
+        nargt--;
+    }
     for(i=0; i < nargt; i++) {
         jl_value_t *tti = jl_svecref(tt,i);
         if (jl_is_cpointer_type(tti) && jl_is_typevar(jl_tparam0(tti))) {
@@ -1106,8 +1113,8 @@ static Value *emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
         }
     }
 
-    if ((!isVa && jl_svec_len(tt)  != (nargs-2)/2) ||
-        ( isVa && jl_svec_len(tt)-1 > (nargs-2)/2))
+    if ((!isVa && nargt  != (nargs-2)/2) ||
+        ( isVa && nargt-1 > (nargs-2)/2))
         jl_error("ccall: wrong number of arguments to C function");
 
     // some special functions
@@ -1243,7 +1250,7 @@ static Value *emit_ccall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
         jl_value_t *jargty;
         if (isVa && ai >= nargt-1) {
             largty = fargt[nargt-1];
-            jargty = jl_tparam0(jl_svecref(tt,nargt-1));
+            jargty = jl_svecref(tt,nargt-1);
         }
         else {
             largty = fargt[sret+ai];

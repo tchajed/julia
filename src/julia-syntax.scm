@@ -448,11 +448,13 @@
            (pair? (caddr e)) (memq (car (caddr e)) '(quote inert))
            (symbol? (cadr (caddr e))))))
 
-(define (va->dots arglist)
+;; convert (a (... b)) to (a b ...), optionally quoting the dots
+(define (va->dots arglist . quoted)
   (if (length> arglist 0)
       (let ((l (last arglist)))
 	(if (vararg? l)
-	    `(,@(butlast arglist) ,(cadr l) ...)
+	    `(,@(butlast arglist) ,(cadr l) ,(if (or (null? quoted) (not (car quoted)))
+						 '... ''...))
 	    arglist))
       arglist))
 
@@ -1008,7 +1010,8 @@
     (if (or (null? F) (null? A))
         `(block
           ,.(reverse! stmts)
-          (call (top ccall) ,name ,RT (call (top svec) ,@atypes) ,.(reverse! C)
+          (call (top ccall) ,name ,RT (call (top svec) ,@(va->dots atypes #t))
+		,.(reverse! C)
                 ,@A))
         (let* ((a     (car A))
                (isseq (and (pair? (car F)) (eq? (caar F) '...)))
