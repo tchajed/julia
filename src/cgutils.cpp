@@ -1476,7 +1476,7 @@ static jl_value_t *static_constant_instance(Constant *constant, jl_value_t *jt)
         }
     }
 
-    assert(jl_is_tuple(jt));
+    assert(jl_is_tuple_type(jt));
 
     size_t nargs = 0;
     ConstantArray *carr = NULL;
@@ -1491,8 +1491,14 @@ static jl_value_t *static_constant_instance(Constant *constant, jl_value_t *jt)
     else
         assert(false && "Cannot process this type of constant");
 
-    assert(0 && "What to do here?");
-    return NULL;
+    jl_value_t **tupleargs;
+    JL_GC_PUSHARGS(tupleargs, nargs);
+    for(size_t i=0; i < nargs; i++) {
+        tupleargs[i] = static_constant_instance(constant->getAggregateElement(i), jl_tparam(jt,i));
+    }
+    jl_value_t *tpl = jl_f_tuple(NULL, tupleargs, nargs);
+    JL_GC_POP();
+    return tpl;
 }
 
 
