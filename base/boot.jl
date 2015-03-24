@@ -265,7 +265,7 @@ TypeVar(n::Symbol, lb::ANY, ub::ANY) =
 TypeVar(n::Symbol, lb::ANY, ub::ANY, b::Bool) =
     ccall(:jl_new_typevar_, Any, (Any, Any, Any, Any), n, lb::Type, ub::Type, b)::TypeVar
 
-TypeConstructor(p::ANY, t::ANY) = ccall(:jl_new_type_constructor, Any, (Any, Any), p::Tuple, t::Type)
+TypeConstructor(p::ANY, t::ANY) = ccall(:jl_new_type_constructor, Any, (Any, Any), p::SimpleVector, t::Type)
 
 Expr(args::ANY...) = _expr(args...)
 

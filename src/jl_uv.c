@@ -109,7 +109,6 @@ jl_value_t *jl_callback_call(jl_function_t *f,jl_value_t *val,int count,...)
         return NULL;
     jl_value_t **argv;
     JL_GC_PUSHARGS(argv,count);
-    memset(argv, 0, count*sizeof(jl_value_t*));
     jl_value_t *v;
     va_list argp;
     va_start(argp,count);

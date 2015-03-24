@@ -53,7 +53,6 @@ static jl_value_t *do_call(jl_function_t *f, jl_value_t **args, size_t nargs,
     JL_GC_PUSHARGS(argv, nargs+1);
     size_t i;
     argv[0] = (jl_value_t*)f;
-    for(i=1; i < nargs+1; i++) argv[i] = NULL;
     i = 0;
     if (eval0) { /* 0-th argument has already been evaluated */
         argv[1] = eval0; i++;
@@ -189,9 +188,6 @@ static jl_value_t *eval(jl_value_t *e, jl_value_t **locals, size_t nl, size_t ng
                 if (nreq==0 || !jl_is_rest_arg(jl_cellref(formals,nreq-1))) {
                     jl_value_t **ar;
                     JL_GC_PUSHARGS(ar, na*2);
-                    for(int i=0; i < na*2; i++) {
-                        ar[i] = NULL;
-                    }
                     for(int i=0; i < na; i++) {
                         ar[i*2+1] = eval(args[i+1], locals, nl, ngensym);
                         gc_wb(ex->args, ar[i*2+1]);
@@ -509,9 +505,6 @@ jl_value_t *jl_toplevel_eval_body(jl_array_t *stmts)
     if (ngensym > 0) {
         JL_GC_PUSHARGS(locals, ngensym);
     }
-    for (i = 0; i < ngensym; i++) {
-        locals[i] = NULL;
-    }
     jl_value_t *ret = eval_body(stmts, locals, 0, ngensym, 0, 1);
     if (ngensym > 0)
         JL_GC_POP();
@@ -600,19 +593,15 @@ jl_value_t *jl_interpret_toplevel_thunk_with(jl_lambda_info_t *lam,
     jl_value_t *gensym_types = jl_lam_gensyms(ast);
     size_t ngensym = (jl_is_array(gensym_types) ? jl_array_len(gensym_types) : jl_unbox_gensym(gensym_types));
     JL_GC_PUSHARGS(locals, nl*2+ngensym);
-    jl_value_t *r = (jl_value_t*)jl_emptysvec;
+    jl_value_t *r = (jl_value_t*)jl_nothing;
     size_t i=0;
     for(i=0; i < llength; i++) {
         locals[i*2]   = names[i];
-        locals[i*2+1] = NULL;
+        //locals[i*2+1] = NULL;   // init'd by JL_GC_PUSHARGS
     }
     for(; i < nl; i++) {
         locals[i*2]   = loc[(i-llength)*2];
         locals[i*2+1] = loc[(i-llength)*2+1];
-    }
-    i *= 2;
-    for(; i < nl*2 + ngensym; i++) {
-        locals[i] = NULL;
     }
     r = eval_body(stmts, locals, nl, ngensym, 0, 1);
     JL_GC_POP();

@@ -66,7 +66,6 @@ value_t fl_invoke_julia_macro(value_t *args, uint32_t nargs)
     jl_value_t **margs;
     JL_GC_PUSHARGS(margs, nargs);
     int i;
-    for(i=0; i < nargs; i++) margs[i] = NULL;
     for(i=1; i < nargs; i++) margs[i] = scm_to_julia(args[i], 1);
     jl_value_t *result = NULL;
 

@@ -224,7 +224,6 @@ jl_svec_t *jl_compute_type_union(jl_svec_t *types)
     size_t n = count_union_components(types);
     jl_value_t **temp;
     JL_GC_PUSHARGS(temp, n+1);
-    memset((char*)temp, 0, sizeof(void*)*(n+1));
     size_t idx=0;
     flatten_type_union(types, temp, &idx);
     assert(idx == n);
@@ -880,6 +879,7 @@ static jl_value_t *jl_type_intersect(jl_value_t *a, jl_value_t *b,
             JL_GC_POP();
             return a;
         }
+        JL_GC_POP();
     }
     if (jl_is_tuple_type(b)) {
         return jl_type_intersect(b, a, penv,eqc,var);
@@ -1334,7 +1334,6 @@ jl_value_t *jl_type_intersection_matching(jl_value_t *a, jl_value_t *b,
 {
     jl_value_t **rts;
     JL_GC_PUSHARGS(rts, 2 + 2*MAX_CENV_SIZE);
-    memset(rts, 0, (2+2*MAX_CENV_SIZE)*sizeof(void*));
     cenv_t eqc; eqc.n = 0; eqc.data = &rts[2];
     cenv_t env; env.n = 0; env.data = &rts[2+MAX_CENV_SIZE];
     eqc.tvars = tvars; env.tvars = tvars;
@@ -1629,7 +1628,6 @@ jl_value_t *jl_apply_type_(jl_value_t *tc, jl_value_t **params, size_t n)
         jl_errorf("too many parameters for type %s", tname);
     jl_value_t **env;
     JL_GC_PUSHARGS(env, 2*ntp);
-    memset(env, 0, 2 * ntp * sizeof(jl_value_t*));
     size_t ne = 0;
     for(i=0; i < ntp; i++) {
         jl_tvar_t *tv = (jl_tvar_t*)jl_svecref(tp,i);
@@ -1985,7 +1983,6 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
     assert(tn==jl_tuple_typename || ntp == jl_svec_len(((jl_datatype_t*)tc)->parameters));
     jl_value_t **iparams;
     JL_GC_PUSHARGS(iparams, ntp);
-    for(i=0; i < ntp+2; i++) iparams[i] = NULL;
     //jl_value_t **rt1 = &iparams[ntp+0];  // some extra gc roots
     //jl_value_t **rt2 = &iparams[ntp+1];
     int cacheable = 1, isabstract = 0, bound = 0;
@@ -2679,7 +2676,6 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
             jl_value_t **rts;
             JL_GC_PUSHARGS(rts, MAX_CENV_SIZE);
             cenv_t tenv; tenv.data = rts;
-            memset(tenv.data, 0, MAX_CENV_SIZE*sizeof(void*));
             for(i=0; i < jl_svec_len(t); i++) {
                 int n = env->n;
                 tmp = type_match_(jl_svecref(t,i), parent, env, 1, invariant);
@@ -2830,7 +2826,6 @@ jl_value_t *jl_type_match_(jl_value_t *a, jl_value_t *b, int morespecific)
     jl_value_t **rts;
     JL_GC_PUSHARGS(rts, MAX_CENV_SIZE);
     cenv_t env; env.n = 0; env.data = rts;
-    memset(env.data, 0, MAX_CENV_SIZE*sizeof(void*));
     jl_value_t *m = type_match_(a, b, &env, morespecific, 0);
     if (m != jl_false) {
         m = (jl_value_t*)jl_alloc_svec_uninit(env.n);

@@ -129,9 +129,9 @@ function promote(x, y, z)
      convert(promote_typeof(x,y,z), z))
 end
 function promote(x, y, zs...)
-    tuple(convert(promote_typeof(x,y,zs...), x),
-          convert(promote_typeof(x,y,zs...), y),
-          convert((promote_typeof(x,y,zs...)...), zs)...)
+    (convert(promote_typeof(x,y,zs...), x),
+     convert(promote_typeof(x,y,zs...), y),
+     convert(Tuple{promote_typeof(x,y,zs...),...}, zs)...)
 end
 # TODO: promote{T}(x::T, ys::T...) here to catch all circularities?
 

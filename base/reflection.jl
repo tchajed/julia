@@ -89,7 +89,7 @@ isgeneric(f::ANY) = (isa(f,Function) && isa(f.env,MethodTable))
 
 function_name(f::Function) = isgeneric(f) ? f.env.name : (:anonymous)
 
-code_lowered(f::Function,t::(Type...)) = map(m->uncompressed_ast(m.func.code), methods(f,t))
+code_lowered{T<:Tuple}(f::Function, t::Type{T}) = map(m->uncompressed_ast(m.func.code), methods(f,t))
 methods(f::Function,t::ANY) = Any[m[3] for m in _methods(f,t,-1)]
 methods(f::ANY,t::ANY) = methods(call, tuple(isa(f,Type) ? Type{f} : typeof(f), t...))
 _methods(f::ANY,t::ANY,lim) = _methods(f, Any[(t::Tuple)...], length(t::Tuple), lim, [])
@@ -140,7 +140,7 @@ end
 start(mt::MethodTable) = mt.defs
 next(mt::MethodTable, m::Method) = (m,m.next)
 done(mt::MethodTable, m::Method) = false
-done(mt::MethodTable, i::()) = true
+done(mt::MethodTable, i::Void) = true
 
 uncompressed_ast(l::LambdaStaticData) =
     isa(l.ast,Expr) ? l.ast : ccall(:jl_uncompress_ast, Any, (Any,Any), l, l.ast)
@@ -153,12 +153,12 @@ function _dump_function(f, t::ANY, native, wrapper)
     str
 end
 
-code_llvm(io::IO, f::Function, types::(Type...)) = print(io, _dump_function(f, types, false, false))
-code_llvm(f::Function, types::(Type...)) = code_llvm(STDOUT, f, types)
-code_native(io::IO, f::Function, types::(Type...)) = print(io, _dump_function(f, types, true, false))
-code_native(f::Function, types::(Type...)) = code_native(STDOUT, f, types)
+code_llvm(io::IO, f::Function, types::Type) = print(io, _dump_function(f, types, false, false))
+code_llvm(f::Function, types::Type) = code_llvm(STDOUT, f, types)
+code_native(io::IO, f::Function, types::Type) = print(io, _dump_function(f, types, true, false))
+code_native(f::Function, types::Type) = code_native(STDOUT, f, types)
 
-function which(f::ANY, t::(Type...))
+function which(f::ANY, t::Type)
     if isleaftype(t)
         ms = methods(f, t)
         isempty(ms) && error("no method found for the specified argument types")

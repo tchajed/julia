@@ -1212,7 +1212,6 @@ jl_value_t *jl_static_eval(jl_value_t *ex, void *ctx_, jl_module_t *mod,
                         size_t n = jl_array_dim0(e->args);
                         jl_value_t **v;
                         JL_GC_PUSHARGS(v, n);
-                        memset(v, 0, n*sizeof(jl_value_t*));
                         v[0] = f;
                         for (i = 1; i < n; i++) {
                             v[i] = jl_static_eval(jl_exprarg(e,i),ctx,mod,sp,ast,sparams,allow_alloc);
@@ -1243,7 +1242,6 @@ jl_value_t *jl_static_eval(jl_value_t *ex, void *ctx_, jl_module_t *mod,
                         return NULL;
                     jl_value_t **v;
                     JL_GC_PUSHARGS(v, n);
-                    memset(v, 0, n*sizeof(jl_value_t*));
                     for (i = 0; i < n; i++) {
                         v[i] = jl_static_eval(jl_exprarg(e,i+1),ctx,mod,sp,ast,sparams,allow_alloc);
                         if (v[i] == NULL) {
@@ -2274,6 +2272,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         }
         // TODO: faster code for integer index
     }
+    /*
     else if (f->fptr == &jl_f_instantiate_type && nargs > 0) {
         size_t i;
         for(i=1; i <= nargs; i++) {
@@ -2292,6 +2291,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
             }
         }
     }
+    */
     else if (f->fptr == &jl_f_sizeof && nargs == 1) {
         jl_datatype_t *sty = (jl_datatype_t*)expr_type(args[1], ctx);
         rt1 = (jl_value_t*)sty;

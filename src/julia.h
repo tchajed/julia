@@ -9,6 +9,7 @@ extern "C" {
 
 #include "libsupport.h"
 #include <stdint.h>
+#include <string.h>
 
 #include "htable.h"
 #include "arraylist.h"
@@ -1163,8 +1164,9 @@ extern DLLEXPORT jl_gcframe_t *jl_pgcstack;
 
 #define JL_GC_PUSHARGS(rts_var,n)                               \
   rts_var = ((jl_value_t**)alloca(((n)+2)*sizeof(jl_value_t*)))+2;    \
-  ((void**)rts_var)[-2] = (void*)(((size_t)n)<<1);              \
+  ((void**)rts_var)[-2] = (void*)(((size_t)(n))<<1);                  \
   ((void**)rts_var)[-1] = jl_pgcstack;                          \
+  memset((void*)rts_var, 0, (n)*sizeof(jl_value_t*));           \
   jl_pgcstack = (jl_gcframe_t*)&(((void**)rts_var)[-2])
 
 #define JL_GC_POP() (jl_pgcstack = jl_pgcstack->prev)

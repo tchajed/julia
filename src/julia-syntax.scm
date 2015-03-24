@@ -1273,7 +1273,7 @@
                        (block
                         (const ,name)
                         (= ,name (call (top TypeConstructor)
-                                       (call (top tuple) ,@params)
+                                       (call (top svec) ,@params)
                                        ,(expand-binding-forms type-ex)))))
                      ,@(symbols->typevars params bounds #t))))
            (expand-binding-forms
@@ -1476,7 +1476,7 @@
                       (cons (make-assignment L temp) after)
                       (cons temp elts))))))))
 
-;; convert (lhss...) = x to tuple indexing, handling the general case
+;; convert (lhss...) = x to tuple indexing
 (define (lower-tuple-assignment lhss x)
   (let ((t (make-jlgensym)))
     `(block
@@ -1485,7 +1485,7 @@
                    (i   1))
           (if (null? lhs) '((null))
               (cons `(= ,(car lhs)
-                        (call (top tupleref) ,t ,i))
+                        (call (top getfield) ,t ,i))
                     (loop (cdr lhs)
                           (+ i 1)))))
       ,t)))
@@ -1782,14 +1782,14 @@
                     (define (tuple-wrap a run)
                       (if (null? a)
                           (if (null? run) '()
-                              (list `(call (top tuple) ,.(reverse run))))
+                              (list `(call (top svec) ,.(reverse run))))
                           (let ((x (car a)))
                             (if (and (length= x 2)
                                      (eq? (car x) '...))
                                 (if (null? run)
                                     (list* (cadr x)
                                            (tuple-wrap (cdr a) '()))
-                                    (list* `(call (top tuple) ,.(reverse run))
+                                    (list* `(call (top svec) ,.(reverse run))
                                            (cadr x)
                                            (tuple-wrap (cdr a) '())))
                                 (tuple-wrap (cdr a) (cons x run))))))

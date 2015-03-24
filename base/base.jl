@@ -37,20 +37,32 @@ call{T}(::Type{T}, args...) = convert(T, args...)::T
 
 convert{T}(::Type{T}, x::T) = x
 
-convert(::(), ::()) = ()
+convert(::Type{Tuple{}}, ::Tuple{}) = ()
 convert(::Type{Tuple}, x::Tuple) = x
+convert{T}(::Type{Tuple{T,...}}, x::Tuple) = cnvt_all(T, x...)
+cnvt_all(T) = ()
+cnvt_all(T, x, rest...) = tuple(convert(T,x), cnvt_all(T, rest...)...)
+
+stagedfunction tuple_type_head{T<:Tuple}(::Type{T})
+    T.parameters[1]
+end
+
+stagedfunction tuple_type_tail{T<:Tuple}(::Type{T})
+    if T.va
+        if length(T.parameters) == 1
+            return T
+        end
+        Tuple{argtail(T.parameters...)..., ...}
+    else
+        Tuple{argtail(T.parameters...)...}
+    end
+end
 
 argtail(x, rest...) = rest
 tail(x::Tuple) = argtail(x...)
 
-convert(T::(Type, Type...), x::(Any, Any...)) =
-    tuple(convert(T[1],x[1]), convert(tail(T), tail(x))...)
-convert(T::(Any, Any...), x::(Any, Any...)) =
-    tuple(convert(T[1],x[1]), convert(tail(T), tail(x))...)
-
-convert{T}(::Type{(T...)}, x::Tuple) = cnvt_all(T, x...)
-cnvt_all(T) = ()
-cnvt_all(T, x, rest...) = tuple(convert(T,x), cnvt_all(T, rest...)...)
+convert{T<:Tuple{Any,Any,...}}(::Type{T}, x::Tuple{Any, Any, ...}) =
+    tuple(convert(tuple_type_head(T),x[1]), convert(tuple_type_tail(T), tail(x))...)
 
 # conversions used by ccall
 ptr_arg_cconvert{T}(::Type{Ptr{T}}, x) = cconvert(T, x)
@@ -251,7 +263,7 @@ end
 
 call{T,N}(::Type{Array{T}}, d::NTuple{N,Int}) =
     ccall(:jl_new_array, Array{T,N}, (Any,Any), Array{T,N}, d)
-call{T}(::Type{Array{T}}, d::Integer...) = Array{T}(convert((Int...), d))
+call{T}(::Type{Array{T}}, d::Integer...) = Array{T}(convert(Tuple{Int,...}, d))
 
 call{T}(::Type{Array{T}}, m::Integer) =
     ccall(:jl_alloc_array_1d, Array{T,1}, (Any,Int), Array{T,1}, m)
@@ -262,7 +274,7 @@ call{T}(::Type{Array{T}}, m::Integer, n::Integer, o::Integer) =
 
 # TODO: possibly turn these into deprecations
 Array{T,N}(::Type{T}, d::NTuple{N,Int}) = Array{T}(d)
-Array{T}(::Type{T}, d::Integer...)      = Array{T}(convert((Int...), d))
+Array{T}(::Type{T}, d::Integer...)      = Array{T}(convert(Tuple{Int,...}, d))
 Array{T}(::Type{T}, m::Integer)                       = Array{T}(m)
 Array{T}(::Type{T}, m::Integer,n::Integer)            = Array{T}(m,n)
 Array{T}(::Type{T}, m::Integer,n::Integer,o::Integer) = Array{T}(m,n,o)
@@ -277,6 +289,11 @@ function getindex(v::SimpleVector, i::Int)
     end
     unsafe_load(convert(Ptr{Any},data_pointer_from_objref(v)) + i*sizeof(Ptr))
 end
+
+start(v::SimpleVector) = 1
+next(v::SimpleVector,i) = (v[i],i+1)
+done(v::SimpleVector,i) = (i > v.length)
+isempty(v::SimpleVector) = (v.length == 0)
 
 immutable Nullable{T}
     isnull::Bool
