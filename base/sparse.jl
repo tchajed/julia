@@ -1,6 +1,5 @@
 module SparseMatrix
 
-using Base: NonTupleType
 using Base.Sort: Forward
 using Base.LinAlg: AbstractTriangular
 

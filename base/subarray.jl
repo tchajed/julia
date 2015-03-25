@@ -5,7 +5,7 @@ typealias RangeIndex Union(Int, Range{Int}, UnitRange{Int}, Colon)
 # LD is the last dimension up through which this object has efficient
 # linear indexing. If LD==N, then the object itself has efficient
 # linear indexing.
-immutable SubArray{T,N,P<:AbstractArray,I<:(ViewIndex...),LD} <: AbstractArray{T,N}
+immutable SubArray{T,N,P<:AbstractArray,I<:Tuple{ViewIndex,...},LD} <: AbstractArray{T,N}
     parent::P
     indexes::I
     dims::NTuple{N,Int}
@@ -34,7 +34,7 @@ parentindexes(a::AbstractArray) = ntuple(ndims(a), i->1:size(a,i))
 ## SubArray creation
 # Drops singleton dimensions (those indexed with a scalar)
 slice(A::AbstractArray, I::ViewIndex...) = _slice(A, I)
-slice(A::AbstractArray, I::(ViewIndex...)) = _slice(A, I)
+slice(A::AbstractArray, I::Tuple{ViewIndex,...}) = _slice(A, I)
 function _slice(A, I)
     checkbounds(A, I...)
     slice_unsafe(A, I)
@@ -63,7 +63,7 @@ end
 # Conventional style (drop trailing singleton dimensions, keep any
 # other singletons)
 sub(A::AbstractArray, I::ViewIndex...) = _sub(A, I)
-sub(A::AbstractArray, I::(ViewIndex...)) = _sub(A, I)
+sub(A::AbstractArray, I::Tuple{ViewIndex,...}) = _sub(A, I)
 function _sub(A, I)
     checkbounds(A, I...)
     sub_unsafe(A, I)
@@ -415,15 +415,15 @@ function subarray_linearindexing_dim{A<:AbstractArray}(::Type{A}, It::Tuple)
     LD
 end
 
-unsafe_convert{T,N,P<:Array,I<:(RangeIndex...)}(::Type{Ptr{T}}, V::SubArray{T,N,P,I}) =
+unsafe_convert{T,N,P<:Array,I<:Tuple{RangeIndex,...}}(::Type{Ptr{T}}, V::SubArray{T,N,P,I}) =
     pointer(V.parent) + (V.first_index-1)*sizeof(T)
 
-unsafe_convert{T,N,P<:Array,I<:(RangeIndex...)}(::Type{Ptr{Void}}, V::SubArray{T,N,P,I}) =
+unsafe_convert{T,N,P<:Array,I<:Tuple{RangeIndex,...}}(::Type{Ptr{Void}}, V::SubArray{T,N,P,I}) =
     convert(Ptr{Void}, unsafe_convert(Ptr{T}, V))
 
 pointer(V::SubArray, i::Int) = pointer(V, ind2sub(size(V), i))
 
-function pointer{T,N,P<:Array,I<:(RangeIndex...)}(V::SubArray{T,N,P,I}, is::(Int...))
+function pointer{T,N,P<:Array,I<:Tuple{RangeIndex,...}}(V::SubArray{T,N,P,I}, is::Tuple{Int,...})
     index = first_index(V)
     strds = strides(V)
     for d = 1:length(is)

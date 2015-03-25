@@ -2966,7 +2966,7 @@ void jl_init_types(void)
     jl_simplevector_type->struct_decl = NULL;
     jl_simplevector_type->abstract = 0;
     jl_simplevector_type->pointerfree = 0;
-    jl_simplevector_type->mutabl = 0;
+    jl_simplevector_type->mutabl = 1;
     jl_simplevector_type->ninitialized = 1;
 
     jl_anytuple_type = jl_new_datatype(jl_symbol("Tuple"), jl_any_type, jl_emptysvec,
@@ -3236,6 +3236,7 @@ void jl_init_types(void)
     jl_compute_field_offsets(jl_typector_type);
     jl_compute_field_offsets(jl_function_type);
     jl_compute_field_offsets(jl_simplevector_type);
+    jl_simplevector_type->pointerfree = 0;
 
     call_sym = jl_symbol("call");
     call1_sym = jl_symbol("call1");

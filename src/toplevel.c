@@ -647,9 +647,9 @@ static int type_contains(jl_value_t *ty, jl_value_t *x)
 {
     if (ty == x) return 1;
     if (jl_is_uniontype(ty))
-        return type_contains(jl_fieldref(ty,0), x);
+        return svec_contains((jl_svec_t*)jl_fieldref(ty,0), x);
     if (jl_is_datatype(ty))
-        return svec_contains((jl_svec_t*)(jl_value_t*)((jl_datatype_t*)ty)->parameters, x);
+        return svec_contains(((jl_datatype_t*)ty)->parameters, x);
     return 0;
 }
 

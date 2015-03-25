@@ -1,5 +1,3 @@
-const NonTupleType = Union(DataType,UnionType,TypeConstructor)
-
 typealias Callable Union(Function,DataType)
 
 const Bottom = Union()

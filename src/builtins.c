@@ -1262,10 +1262,11 @@ void jl_init_primitives(void)
 
 // toys for debugging ---------------------------------------------------------
 
-static size_t jl_show_svec(JL_STREAM *out, jl_svec_t *t)
+static size_t jl_show_svec(JL_STREAM *out, jl_svec_t *t, char *head)
 {
     size_t i, n=0, len = jl_svec_len(t);
-    n += jl_printf(out, "svec(");
+    n += jl_printf(out, "%s", head);
+    n += jl_printf(out, "(");
     for (i = 0; i < len; i++) {
         jl_value_t *v = jl_svecref(t,i);
         n += jl_static_show(out, v);
@@ -1311,7 +1312,7 @@ size_t jl_static_show_x(JL_STREAM *out, jl_value_t *v, int depth)
         //jl_static_show(out, !jl_is_expr(li->ast) ? jl_uncompress_ast(li, li->ast) : li->ast);
     }
     else if (jl_is_svec(v)) {
-        n += jl_show_svec(out, (jl_svec_t*)v);
+        n += jl_show_svec(out, (jl_svec_t*)v, "svec");
     }
     else if (jl_is_datatype(v)) {
         jl_datatype_t *dv = (jl_datatype_t*)v;
@@ -1398,7 +1399,7 @@ size_t jl_static_show_x(JL_STREAM *out, jl_value_t *v, int depth)
     }
     else if (jl_is_uniontype(v)) {
         n += jl_printf(out, "Union");
-        n += jl_static_show_x(out, (jl_value_t*)((jl_uniontype_t*)v)->types, depth);
+        n += jl_show_svec(out, ((jl_uniontype_t*)v)->types, "");
     }
     else if (jl_is_typector(v)) {
         n += jl_static_show_x(out, ((jl_typector_t*)v)->body, depth);
