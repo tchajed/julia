@@ -1589,6 +1589,8 @@ static int valid_type_param(jl_value_t *v)
 
 jl_value_t *jl_apply_type_(jl_value_t *tc, jl_value_t **params, size_t n)
 {
+    if (tc == (jl_value_t*)jl_anytuple_type)
+        return (jl_value_t*)jl_apply_tuple_type_v(params, n, 0);
     if (n == 0) {
         if (jl_is_typector(tc))
             return (jl_value_t*)((jl_typector_t*)tc)->body;
@@ -1898,16 +1900,18 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
 
 static jl_tupletype_t *jl_apply_tuple_type_v_(jl_value_t **p, size_t np, int va, jl_svec_t *params)
 {
-    int isabstract = va;
+    int isabstract = va, cacheable = 1;
     if (!va) {
         for(size_t i=0; i < np; i++) {
-            if (!jl_is_leaf_type(p[i])) {
-                isabstract = 1; break;
-            }
+            if (!jl_is_leaf_type(p[i]))
+                isabstract = 1;
+            if (jl_has_typevars_(p[i],0))
+                cacheable = 0;
         }
     }
+    cacheable &= (!isabstract);
     jl_datatype_t *ndt = (jl_datatype_t*)inst_datatype(jl_anytuple_type, params, p, np,
-                                                       !isabstract, isabstract, NULL, NULL, 0);
+                                                       cacheable, isabstract, NULL, NULL, 0);
     if (va) ndt->va = 1;
     return ndt;
 }
@@ -2018,9 +2022,9 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
                 }
                 if (jl_is_typevar(iparams[i]))
                     isabstract = 1;
-                if (jl_has_typevars_(iparams[i],0))
-                    cacheable = 0;
             }
+            if (jl_has_typevars_(iparams[i],0))
+                cacheable = 0;
         }
     }
     // if t's parameters are not bound in the environment, return it uncopied (#9378)

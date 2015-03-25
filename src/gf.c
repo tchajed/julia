@@ -49,9 +49,8 @@ static int cache_match_by_type(jl_value_t **types, size_t n, jl_tupletype_t *sig
         jl_value_t *decl = jl_field_type(sig, i);
         if (i == jl_datatype_nfields(sig)-1) {
             if (va) {
-                jl_value_t *t = jl_tparam0(decl);
                 for(; i < n; i++) {
-                    if (!jl_subtype(types[i], t, 0))
+                    if (!jl_subtype(types[i], decl, 0))
                         return 0;
                 }
                 return 1;
@@ -96,9 +95,8 @@ static inline int cache_match(jl_value_t **args, size_t n, jl_tupletype_t *sig,
         jl_value_t *decl = jl_field_type(sig, i);
         if (i == lensig-1) {
             if (va) {
-                jl_value_t *t = jl_tparam0(decl);
                 for(; i < n; i++) {
-                    if (!jl_subtype(args[i], t, 1))
+                    if (!jl_subtype(args[i], decl, 1))
                         return 0;
                 }
                 return 1;

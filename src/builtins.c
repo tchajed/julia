@@ -1010,10 +1010,10 @@ JL_CALLABLE(jl_f_instantiate_type)
     int va = args[0]!=jl_false;
     if (!jl_is_datatype(args[1]))
         JL_TYPECHK(instantiate_type, typector, args[1]);
-    if (args[1] == jl_anytuple_type) {
+    if (args[1] == (jl_value_t*)jl_anytuple_type) {
         if (va && nargs <= 2)
             jl_error("a variadic tuple type must have at least one parameter");
-        return jl_apply_tuple_type_v(&args[2], nargs-2, va);
+        return (jl_value_t*)jl_apply_tuple_type_v(&args[2], nargs-2, va);
     }
     else if (va) {
         jl_error("only tuple types can be variadic");
@@ -1322,7 +1322,7 @@ size_t jl_static_show_x(JL_STREAM *out, jl_value_t *v, int depth)
         }
         n += jl_printf(out, "%s", dv->name->name->name);
         if (dv->parameters && (jl_value_t*)dv != dv->name->primary) {
-            size_t j, tlen = jl_datatype_nfields(dv);
+            size_t j, tlen = jl_nparams(dv);
             if (tlen > 0) {
                 n += jl_printf(out, "{");
                 for (j = 0; j < tlen; j++) {
@@ -1331,7 +1331,7 @@ size_t jl_static_show_x(JL_STREAM *out, jl_value_t *v, int depth)
                     if (j != tlen-1)
                         n += jl_printf(out, ", ");
                     else if (jl_is_tuple_type(v) && dv->va)
-                        n += jl_printf(out, "...");
+                        n += jl_printf(out, ", ...");
                 }
                 n += jl_printf(out, "}");
             }

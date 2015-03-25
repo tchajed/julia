@@ -6,7 +6,7 @@ const secret_table_token = :__c782dbf1cf4d6a2e5e3865d7e95634f2e09b5902__
 
 haskey(d::Associative, k) = in(k,keys(d))
 
-function in(p::(Any,Any), a::Associative)
+function in(p::Tuple{Any,Any}, a::Associative)
     v = get(a,p[1],secret_table_token)
     !is(v, secret_table_token) && (v == p[2])
 end
@@ -356,23 +356,23 @@ type Dict{K,V} <: Associative{K,V}
     end
 end
 Dict() = Dict{Any,Any}()
-Dict(kv::()) = Dict()
+Dict(kv::Tuple{}) = Dict()
 copy(d::Dict) = Dict(d)
 
 const AnyDict = Dict{Any,Any}
 
 # TODO: this can probably be simplified using `eltype` as a THT (Tim Holy trait)
-Dict{K,V}(kv::((K,V)...,))               = Dict{K,V}(kv)
-Dict{K  }(kv::((K,Any)...,))             = Dict{K,Any}(kv)
-Dict{V  }(kv::((Any,V)...,))             = Dict{Any,V}(kv)
-Dict{K,V}(kv::(Pair{K,V}...,))           = Dict{K,V}(kv)
-Dict{K}  (kv::(Pair{K}...,))             = Dict{K,Any}(kv)
-Dict{V}  (kv::(Pair{TypeVar(:K),V}...,)) = Dict{Any,V}(kv)
-Dict     (kv::(Pair...,))                = Dict{Any,Any}(kv)
+Dict{K,V}(kv::Tuple{Tuple{K,V},...})          = Dict{K,V}(kv)
+Dict{K  }(kv::Tuple{Tuple{K,Any},...})        = Dict{K,Any}(kv)
+Dict{V  }(kv::Tuple{Tuple{Any,V},...})        = Dict{Any,V}(kv)
+Dict{K,V}(kv::Tuple{Pair{K,V},...})           = Dict{K,V}(kv)
+Dict{K}  (kv::Tuple{Pair{K},...})             = Dict{K,Any}(kv)
+Dict{V}  (kv::Tuple{Pair{TypeVar(:K),V},...}) = Dict{Any,V}(kv)
+Dict     (kv::Tuple{Pair,...})                = Dict{Any,Any}(kv)
 
-Dict{K,V}(kv::AbstractArray{(K,V)})     = Dict{K,V}(kv)
-Dict{K,V}(kv::AbstractArray{Pair{K,V}}) = Dict{K,V}(kv)
-Dict{K,V}(kv::Associative{K,V})         = Dict{K,V}(kv)
+Dict{K,V}(kv::AbstractArray{Tuple{K,V}}) = Dict{K,V}(kv)
+Dict{K,V}(kv::AbstractArray{Pair{K,V}})  = Dict{K,V}(kv)
+Dict{K,V}(kv::Associative{K,V})          = Dict{K,V}(kv)
 
 Dict{K,V}(ps::Pair{K,V}...)            = Dict{K,V}(ps)
 Dict{K}  (ps::Pair{K}...,)             = Dict{K,Any}(ps)
@@ -380,7 +380,7 @@ Dict{V}  (ps::Pair{TypeVar(:K),V}...,) = Dict{Any,V}(ps)
 Dict     (ps::Pair...)                 = Dict{Any,Any}(ps)
 
 Dict(kv) = dict_with_eltype(kv, eltype(kv))
-dict_with_eltype{K,V}(kv, ::Type{(K,V)}) = Dict{K,V}(kv)
+dict_with_eltype{K,V}(kv, ::Type{Tuple{K,V}}) = Dict{K,V}(kv)
 dict_with_eltype{K,V}(kv, ::Type{Pair{K,V}}) = Dict{K,V}(kv)
 dict_with_eltype(kv, t) = Dict{Any,Any}(kv)
 
