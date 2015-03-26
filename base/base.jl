@@ -293,6 +293,10 @@ next(v::SimpleVector,i) = (v[i],i+1)
 done(v::SimpleVector,i) = (i > v.length)
 isempty(v::SimpleVector) = (v.length == 0)
 
+map(f, v::SimpleVector) = Any[ f(v[i]) for i = 1:length(v) ]
+
+getindex(v::SimpleVector, I::AbstractArray) = Any[ v[i] for i in I ]
+
 immutable Nullable{T}
     isnull::Bool
     value::T

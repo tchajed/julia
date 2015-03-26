@@ -10,7 +10,7 @@ end
 const NF = NotFound()
 
 type StaticVarInfo
-    sp::Tuple            # static parameters tuple
+    sp::SimpleVector     # static parameters
     cenv::ObjectIdDict   # types of closed vars
     vars::Array{Any,1}   # names of args and locals
     gensym_types::Array{Any,1} # types of the GenSym's in this function
@@ -30,7 +30,7 @@ end
 type CallStack
     ast
     mod::Module
-    types::Tuple
+    types::Type
     recurred::Bool
     cycleid::Int
     result
@@ -101,10 +101,7 @@ cmp_tfunc = (x,y)->Bool
 
 isType(t::ANY) = isa(t,DataType) && is((t::DataType).name,Type.name)
 
-isvarargtype(t::ANY) = isa(t,DataType)&&is((t::DataType).name,Vararg.name)
-
 const t_func = ObjectIdDict()
-#t_func[tuple] = (0, Inf, (args...)->limit_tuple_depth(args))
 t_func[throw] = (1, 1, x->Bottom)
 t_func[box] = (2, 2, (t,v)->(isType(t) ? t.parameters[1] : Any))
 t_func[eq_int] = (2, 2, cmp_tfunc)
@@ -136,8 +133,7 @@ t_func[eval(Core.Intrinsics,:ccall)] =
         return t
     end)
 t_func[eval(Core.Intrinsics,:llvmcall)] =
-    (3, Inf, (fptr, rt, at, a...)->(isType(rt) ? rt.parameters[1] :
-                                    isa(rt,Tuple) ? map(x->x.parameters[1],rt) : Any))
+    (3, Inf, (fptr, rt, at, a...)->(isType(rt) ? rt.parameters[1] : Any))
 t_func[eval(Core.Intrinsics,:cglobal)] =
     (1, 2, (fptr, t...)->(isempty(t) ? Ptr{Void} :
                           isType(t[1]) ? Ptr{t[1].parameters[1]} : Ptr))
@@ -158,7 +154,6 @@ t_func[Union] = (0, Inf,
 t_func[_expr] = (1, Inf, (args...)->Expr)
 t_func[method_exists] = (2, 2, cmp_tfunc)
 t_func[applicable] = (1, Inf, (f, args...)->Bool)
-t_func[tuplelen] = (1, 1, x->Int)
 t_func[arraylen] = (1, 1, x->Int)
 #t_func[arrayref] = (2,Inf,(a,i...)->(isa(a,DataType) && a<:Array ?
 #                                     a.parameters[1] : Any))
@@ -187,8 +182,6 @@ const typeof_tfunc = function (t)
         else
             Type{typeof(t)}
         end
-    elseif isvarargtype(t)
-        Vararg{typeof_tfunc(t.parameters[1])}
     elseif isa(t,DataType)
         if isleaftype(t)
             Type{t}
@@ -197,8 +190,6 @@ const typeof_tfunc = function (t)
         end
     elseif isa(t,UnionType)
         Union(map(typeof_tfunc, t.types)...)
-    elseif isa(t,Tuple)
-        map(typeof_tfunc, t)
     elseif isa(t,TypeVar)
         Type{t}
     else
@@ -209,88 +200,14 @@ t_func[typeof] = (1, 1, typeof_tfunc)
 # involving constants: typeassert, tupleref, getfield, fieldtype, apply_type
 # therefore they get their arguments unevaluated
 t_func[typeassert] =
-    (2, 2, (A, v, t)->(isType(t) ? typeintersect(v,t.parameters[1]) :
-                       isa(t,Tuple) && all(isType,t) ?
-                           typeintersect(v,map(t->t.parameters[1],t)) :
-                       Any))
-
-const tupleref_tfunc = function (A, t, i)
-    wrapType = false
-    if isType(t)
-        t = t.parameters[1]
-        wrapType = true
-    end
-    if isa(t,DataType) && is(t.name,NTuple.name)
-        T = t.parameters[2]
-        return wrapType ? Type{T} : T
-    end
-    if !isa(t,Tuple)
-        return Any
-    end
-    if is(t,())
-        return Bottom
-    end
-    n = length(t)
-    last = tupleref(t,n)
-    vararg = isvarargtype(last)
-    if A !== () && isa(A[2],Integer)
-        # index is a constant
-        i = A[2]
-        if i > n
-            if vararg
-                T = last.parameters[1]
-            else
-                return Bottom
-            end
-        elseif i == n && vararg
-            T = last.parameters[1]
-        elseif i <= 0
-            return Bottom
-        else
-            T = tupleref(t,i)
-        end
-    else
-        # index unknown, could be anything from the tuple
-        if vararg
-            types = tuple(t[1:(n-1)]..., last.parameters[1])
-        else
-            types = t
-        end
-        if !isa(types, Type)
-            return Any
-        end
-        T = reduce(tmerge, Bottom, types)
-        if wrapType
-            return isleaftype(T) || isa(T,TypeVar) ? Type{T} : Type{TypeVar(:_,T)}
-        else
-            return T
-        end
-    end
-    return wrapType ? (isa(T,Type) ? Type{T} : typeof(T)) : T
-end
-t_func[tupleref] = (2, 2, tupleref_tfunc)
+    (2, 2, (A, v, t)->(isType(t) ? typeintersect(v,t.parameters[1]) : Any))
 
 function limit_type_depth(t::ANY, d::Int, cov::Bool, vars)
     if isa(t,TypeVar) || isa(t,TypeConstructor)
         return t
     end
     inexact = !cov && d > MAX_TYPE_DEPTH
-    if isa(t,Tuple)
-        t === () && return t
-        if d > MAX_TYPE_DEPTH
-            if isvatuple(t)
-                R = Tuple
-            else
-                R = NTuple{length(t),Any}
-            end
-        else
-            l0 = length(vars)
-            R = map(x->limit_type_depth(x, d+1, true, vars), t)
-            if !cov && (length(vars) > l0 || d == MAX_TYPE_DEPTH)
-                inexact = true
-            end
-        end
-    elseif isa(t,UnionType)
+    if isa(t,UnionType)
         t === Bottom && return t
         if d > MAX_TYPE_DEPTH
             R = Any
@@ -339,7 +256,13 @@ const getfield_tfunc = function (A, s0, name)
     if isa(s,UnionType)
         return reduce(tmerge, Bottom, map(t->getfield_tfunc(A, t, name), s.types))
     end
-    if !isa(s,DataType) || s.abstract
+    if !isa(s,DataType)
+        return Any
+    end
+    if is(s.name,NTuple.name)
+        return s.parameters[2]
+    end
+    if s.abstract
         return Any
     end
     if isa(A[2],QuoteNode) && isa(A[2].value,Symbol)
@@ -382,7 +305,11 @@ const getfield_tfunc = function (A, s0, name)
             return Bottom
         end
         i::Int = A[2]
-        if i < 1 || i > nfields(s)
+        nf = nfields(s)
+        if s.va && i > nf
+            return s.types[nf]
+        end
+        if i < 1 || i > nf
             return Bottom
         end
         return s.types[i]
@@ -408,21 +335,11 @@ t_func[fieldtype] = (2, 2, fieldtype_tfunc)
 t_func[Box] = (1, 1, (a,)->Box)
 
 function valid_tparam(x::ANY)
-    if isa(x,Int) || isa(x,Symbol) || isa(x,Bool)
-        return true
-    elseif isa(x,Tuple)
-        for t in x
-            if !valid_tparam(t)
-                return false
-            end
-        end
-        return true
-    end
-    return false
+    return isa(x,Int) || isa(x,Symbol) || isa(x,Bool) || isa(x,Type) || isbits(x)
 end
 
 function extract_simple_tparam(Ai)
-    if (isa(Ai,Int) || isa(Ai,Bool))
+    if isa(Ai,Int) || isa(Ai,Bool)
         return Ai
     elseif isa(Ai,QuoteNode) && valid_tparam(Ai.value)
         return Ai.value
@@ -443,28 +360,47 @@ end
 
 # TODO: handle e.g. apply_type(T, R::Union(Type{Int32},Type{Float64}))
 const apply_type_tfunc = function (A, args...)
+    lA = length(A)
+    isVA = Any
+    if lA > 0
+        if isa(A[1],Bool)
+            isVA = A[1]
+        end
+        A = A[2:end]
+    end
+    args = args[2:end]
     if !isType(args[1])
-        return Any
+        return Type
     end
     headtype = args[1].parameters[1]
-    if isa(headtype,UnionType) || isa(headtype,Tuple) || isa(headtype,TypeVar)
+    if isa(headtype,UnionType) || isa(headtype,TypeVar)
         return args[1]
     end
-    tparams = ()
+    istuple = (headtype == Tuple)
+    if isVA===true && !istuple
+        return Type
+    end
     uncertain = false
-    lA = length(A)
+    if isVA === Any
+        if istuple
+            #return Type  # TODO should be TupleType
+            uncertain = true
+            isVA = true
+        else
+            isVA = false
+        end
+    end
+    tparams = svec()
     for i=2:max(lA,length(args))
         ai = args[i]
         if isType(ai)
             uncertain |= (!isleaftype(ai))
-            tparams = tuple(tparams..., ai.parameters[1])
-        elseif isa(ai,Tuple) && all(isType,ai)
-            tparams = tuple(tparams..., map(t->t.parameters[1], ai))
+            tparams = svec(tparams..., ai.parameters[1])
         else
             if i<=lA
                 val = extract_simple_tparam(A[i])
                 if val !== Bottom
-                    tparams = tuple(tparams..., val)
+                    tparams = svec(tparams..., val)
                     continue
                 elseif isa(inference_stack,CallStack) && isa(A[i],Symbol)
                     sp = inference_stack.sv.sp
@@ -475,7 +411,7 @@ const apply_type_tfunc = function (A, args...)
                             # static parameter
                             val = sp[j+1]
                             if valid_tparam(val)
-                                tparams = tuple(tparams..., val)
+                                tparams = svec(tparams..., val)
                                 found = true
                                 break
                             end
@@ -486,18 +422,22 @@ const apply_type_tfunc = function (A, args...)
                     end
                 end
             end
-            if i-1 > length(headtype.parameters)
+            if !istuple && i-1 > length(headtype.parameters)
                 # too many parameters for type
                 return Bottom
             end
             uncertain = true
-            tparams = tuple(tparams..., headtype.parameters[i-1])
+            if istuple
+                tparams = svec(tparams..., Any)
+            else
+                tparams = svec(tparams..., headtype.parameters[i-1])
+            end
         end
     end
     local appl
     # good, all arguments understood
     try
-        appl = apply_type(headtype, tparams...)
+        appl = apply_type(isVA, headtype, tparams...)
     catch
         # type instantiation might fail if one of the type parameters
         # doesn't match, which could happen if a type estimate is too coarse
@@ -511,31 +451,26 @@ const apply_type_tfunc = function (A, args...)
 end
 t_func[apply_type] = (1, Inf, apply_type_tfunc)
 
-function tuple_tfunc(argtypes::ANY, limit)
-    t = argtypes
-    if limit
-        t = limit_tuple_depth(t)
-    end
-    # tuple(Type{T...}) should give Type{(T...)}
-    if t!==() && all(isType, t) && isvarargtype(t[length(t)].parameters[1])
-        return Type{map(t->t.parameters[1], t)}
-    end
-    return t
+function tuple_tfunc(t::ANY, limit)
+    return limit ? limit_tuple_depth(t) : t
+    ## tuple(Type{T...}) should give Type{(T...)}
+    #if t!==() && all(isType, t) && isvarargtype(t[length(t)].parameters[1])
+    #    return Type{map(t->t.parameters[1], t)}
+    #end
 end
 
-function builtin_tfunction(f::ANY, args::ANY, argtypes::ANY)
-    isva = isvatuple(argtypes)
+function builtin_tfunction(f::ANY, args::ANY, argtype::ANY)
+    argtypes = argtype.parameters
+    isva = argtype.va
     if is(f,tuple)
-        return tuple_tfunc(argtypes, true)
+        return tuple_tfunc(argtype, true)
+    elseif is(f,svec)
+        return SimpleVector
     elseif is(f,arrayset)
         if length(argtypes) < 3 && !isva
             return Bottom
         end
-        a1 = argtypes[1]
-        if isvarargtype(a1)
-            return a1.parameters[1]
-        end
-        return a1
+        return argtypes[1]
     elseif is(f,arrayref)
         if length(argtypes) < 2 && !isva
             return Bottom
@@ -554,7 +489,7 @@ function builtin_tfunction(f::ANY, args::ANY, argtypes::ANY)
         # unknown/unhandled builtin
         return Any
     end
-    tf = tf::(Real, Real, Function)
+    tf = tf::Tuple{Real, Real, Function}
     if isva
         # only some t-funcs can handle varargs
         if is(f,apply_type) || is(f,typeof)
@@ -565,21 +500,11 @@ function builtin_tfunction(f::ANY, args::ANY, argtypes::ANY)
         # wrong # of args
         return Bottom
     end
-    if is(f,typeassert) || is(f,tupleref) || is(f,getfield) ||
-       is(f,apply_type) || is(f,fieldtype)
+    if is(f,typeassert) || is(f,getfield) || is(f,apply_type) || is(f,fieldtype)
         # TODO: case of apply(), where we do not have the args
         return tf[3](args, argtypes...)
     end
     return tf[3](argtypes...)
-end
-
-function a2t(a::AbstractVector)
-    n = length(a)
-    if n==2 return (a[1],a[2]) end
-    if n==1 return (a[1],) end
-    if n==3 return (a[1],a[2],a[3]) end
-    if n==0 return () end
-    return tuple(a...)
 end
 
 function isconstantfunc(f::ANY, sv::StaticVarInfo)
@@ -625,37 +550,36 @@ end
 
 const isconstantref = isconstantfunc
 
-isvatuple(t::Tuple) = (n = length(t); n > 0 && isvarargtype(t[n]))
-
 const limit_tuple_depth = t->limit_tuple_depth_(t,0)
 
 const limit_tuple_depth_ = function (t,d::Int)
     if isa(t,UnionType)
         # also limit within Union types.
         # may have to recur into other stuff in the future too.
-        return Union(limit_tuple_depth_(t.types,d)...)
+        return Union(map(x->limit_tuple_depth_(x,d+1), t.types)...)
     end
-    if !isa(t,Tuple)
+    if !(t <: Tuple)
         return t
     end
     if d > MAX_TUPLE_DEPTH
         return Tuple
     end
-    map(x->limit_tuple_depth_(x,d+1), t)
+    p = map(x->limit_tuple_depth_(x,d+1), t.parameters)
+    if t.va
+        Tuple{p..., ...}
+    else
+        Tuple{p...}
+    end
 end
 
 limit_tuple_type = t -> limit_tuple_type_n(t, MAX_TUPLETYPE_LEN)
 
-const limit_tuple_type_n = function (t::Tuple, lim::Int)
-    n = length(t)
+const limit_tuple_type_n = function (t, lim::Int)
+    p = t.parameters
+    n = length(p)
     if n > lim
-        last = t[n]
-        if isvarargtype(last)
-            last = last.parameters[1]
-        end
-        tail = tuple(t[lim:(n-1)]..., last)
-        tail = typeintersect(reduce(tmerge, Bottom, tail), Any)
-        return tuple(t[1:(lim-1)]..., Vararg{tail})
+        tail = reduce(tmerge, Bottom, p[lim:n])
+        return Tuple{p[1:(lim-1)]..., tail, ...}
     end
     return t
 end
@@ -681,7 +605,8 @@ let stagedcache=Dict{Any,Any}()
     end
 end
 
-function abstract_call_gf(f, fargs, argtypes, e)
+function abstract_call_gf(f, fargs, argtype, e)
+    argtypes = argtype.parameters
     if length(argtypes)>1 && (argtypes[1] <: Tuple) && argtypes[2]===Int
         # allow tuple indexing functions to take advantage of constant
         # index arguments.
@@ -727,8 +652,9 @@ function abstract_call_gf(f, fargs, argtypes, e)
     # It is important for N to be >= the number of methods in the error()
     # function, so we can still know that error() is always Bottom.
     # here I picked 4.
-    argtypes = limit_tuple_type(argtypes)
-    applicable = _methods(f, argtypes, 4)
+    argtype = limit_tuple_type(argtype)
+    argtypes = argtype.parameters
+    applicable = _methods(f, argtype, 4)
     rettype = Bottom
     if is(applicable,false)
         # this means too many methods matched
@@ -751,7 +677,7 @@ function abstract_call_gf(f, fargs, argtypes, e)
             e.head = :call
         end
     end
-    for (m::Tuple) in x
+    for (m::SimpleVector) in x
         local linfo
         try
             linfo = func_for_method(m[3],argtypes,m[2])
@@ -2132,7 +2058,7 @@ function without_linenums(a::Array{Any,1})
 end
 
 # known affect-free calls (also effect-free)
-const _pure_builtins = Any[tuple, tupleref, tuplelen, fieldtype, apply_type, is, isa, typeof, typeassert]
+const _pure_builtins = Any[tuple, svec, fieldtype, apply_type, is, isa, typeof, typeassert]
 
 # known effect-free calls (might not be affect-free)
 const _pure_builtins_volatile = Any[getfield, arrayref]
