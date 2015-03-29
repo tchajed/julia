@@ -185,8 +185,8 @@ reshape(a::AbstractArray, dims::Int...) = reshape(a, dims)
 vec(a::AbstractArray) = reshape(a,length(a))
 vec(a::AbstractVector) = a
 
-_sub(::(), ::()) = ()
-_sub(t::Tuple, ::()) = t
+_sub(::Tuple{}, ::Tuple{}) = ()
+_sub(t::Tuple, ::Tuple{}) = t
 _sub(t::Tuple, s::Tuple) = _sub(tail(t), tail(s))
 
 function squeeze(A::AbstractArray, dims::Dims)
@@ -517,7 +517,7 @@ end
 typealias RangeVecIntList{A<:AbstractVector{Int}} Union(Tuple{Union(Range, AbstractVector{Int}),...}, AbstractVector{UnitRange{Int}}, AbstractVector{Range{Int}}, AbstractVector{A})
 
 get(A::AbstractArray, i::Integer, default) = in_bounds(length(A), i) ? A[i] : default
-get(A::AbstractArray, I::(), default) = similar(A, typeof(default), 0)
+get(A::AbstractArray, I::Tuple{}, default) = similar(A, typeof(default), 0)
 get(A::AbstractArray, I::Dims, default) = in_bounds(size(A), I...) ? A[I...] : default
 
 function get!{T}(X::AbstractArray{T}, A::AbstractArray, I::Union(Range, AbstractVector{Int}), default::T)

@@ -729,17 +729,15 @@ DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t 
     }
 
     // TODO
-    /*
-    size_t na = jl_svec_len(argtypes);
+    size_t na = jl_nparams(argtypes);
     for(size_t i=0; i < na; i++) {
-        jl_value_t *elt = jl_svecref(argtypes,i);
+        jl_value_t *elt = jl_tparam(argtypes,i);
         if (!jl_is_type(elt) && !jl_is_typevar(elt)) {
             jl_lambda_info_t *li = f->linfo;
             jl_exceptionf(jl_argumenterror_type, "invalid type for argument %s in method definition for %s at %s:%d",
                           jl_lam_argname(li,i)->name, name->name, li->file->name, li->line);
         }
     }
-    */
 
     int ishidden = !!strchr(name->name, '#');
     for(size_t i=0; i < jl_svec_len(tvars); i++) {

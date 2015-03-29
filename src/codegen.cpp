@@ -778,19 +778,18 @@ extern "C" void jl_compile(jl_function_t *f)
 // Get the LLVM Function* for the C-callable entry point for a certain function
 // and argument types. If rt is NULL then whatever return type is present is
 // accepted.
-static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_svec_t *argt, int64_t isref);
-static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_t *argt)
+static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_tupletype_t *argt, int64_t isref);
+static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_tupletype_t *argt)
 {
     if (rt) {
         JL_TYPECHK(cfunction, type, rt);
     }
-    JL_TYPECHK(cfunction, simplevector, argt);
-    JL_TYPECHK(cfunction, type, argt);
+    JL_TYPECHK(cfunction, type, (jl_value_t*)argt);
     JL_TYPECHK(cfunction, function, (jl_value_t*)f);
     if (!jl_is_gf(f))
         jl_error("only generic functions are currently c-callable");
 
-    size_t i, nargs = jl_svec_len(argt);
+    size_t i, nargs = jl_nparams(argt);
     if (nargs >= 64)
         jl_error("only functions with less than 64 arguments are c-callable");
 
@@ -799,7 +798,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
     JL_GC_PUSH1(&sigt);
     sigt = (jl_value_t*)jl_alloc_svec(nargs);
     for (i = 0; i < nargs; i++) {
-        jl_value_t *ati = jl_svecref(argt, i);
+        jl_value_t *ati = jl_tparam(argt, i);
         if (jl_is_abstract_ref_type(ati)) {
             ati = jl_tparam0(ati);
             if (jl_is_typevar(ati))
@@ -848,7 +847,7 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
             }
         }
         JL_GC_POP(); // kill list: sigt
-        return gen_cfun_wrapper(ff, astrt, (jl_svec_t*)argt, isref);
+        return gen_cfun_wrapper(ff, astrt, argt, isref);
     }
     jl_error("cfunction: no method exactly matched the required type signature (function not yet c-callable)");
 }
@@ -857,7 +856,8 @@ static Function *jl_cfunction_object(jl_function_t *f, jl_value_t *rt, jl_value_
 extern "C" DLLEXPORT
 void *jl_function_ptr(jl_function_t *f, jl_value_t *rt, jl_value_t *argt)
 {
-    Function *llvmf = jl_cfunction_object(f, rt, argt);
+    assert(jl_is_tuple_type(argt));
+    Function *llvmf = jl_cfunction_object(f, rt, (jl_tupletype_t*)argt);
     assert(llvmf);
 #ifdef USE_MCJIT
     return (void*)(intptr_t)jl_ExecutionEngine->getFunctionAddress(llvmf->getName());
@@ -870,7 +870,8 @@ void *jl_function_ptr(jl_function_t *f, jl_value_t *rt, jl_value_t *argt)
 extern "C" DLLEXPORT
 void jl_extern_c(jl_function_t *f, jl_value_t *rt, jl_value_t *argt, char *name)
 {
-    Function *llvmf = jl_cfunction_object(f, rt, argt);
+    assert(jl_is_tuple_type(argt));
+    Function *llvmf = jl_cfunction_object(f, rt, (jl_tupletype_t*)argt);
     if (llvmf) {
         #ifndef LLVM35
         new GlobalAlias(llvmf->getType(), GlobalValue::ExternalLinkage, name, llvmf, llvmf->getParent());
@@ -1831,9 +1832,9 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         if (ctx->linfo->inferred) {
             jl_svec_t *aty = call_arg_types(&args[1], nargs, ctx);
             rt1 = (jl_value_t*)aty;
-            rt1 = (jl_value_t*)jl_apply_tuple_type(aty,false);
             // attempt compile-time specialization for inferred types
             if (aty != NULL) {
+                rt1 = (jl_value_t*)jl_apply_tuple_type(aty,false);
                 /*
                   if (trace) {
                       jl_printf(JL_STDOUT, "call %s%s\n",
@@ -2358,7 +2359,7 @@ static Value *emit_call_function_object(jl_function_t *f, Value *theF, Value *th
         unsigned idx = 0;
         for(size_t i=0; i < nargs; i++) {
             Type *at = cft->getParamType(idx);
-            Type *et = julia_type_to_llvm(jl_svecref(f->linfo->specTypes,i));
+            Type *et = julia_type_to_llvm(jl_tparam(f->linfo->specTypes,i));
             if (et == T_void || et->isEmptyTy()) {
                 // Still emit the expression in case it has side effects
                 emit_expr(args[i+1], ctx);
@@ -2378,7 +2379,7 @@ static Value *emit_call_function_object(jl_function_t *f, Value *theF, Value *th
             else {
                 assert(at == et);
                 argvals[idx] = emit_unbox(at, emit_unboxed(args[i+1], ctx),
-                                          jl_svecref(f->linfo->specTypes,i));
+                                          jl_tparam(f->linfo->specTypes,i));
                 assert(dyn_cast<UndefValue>(argvals[idx]) == 0);
             }
             idx++;
@@ -3362,7 +3363,7 @@ static void finalize_gc_frame(jl_codectx_t *ctx)
     }
 }
 
-static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_svec_t *argt, int64_t isref)
+static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_tupletype_t *argt, int64_t isref)
 {
     jl_lambda_info_t *lam = ff->linfo;
     cFunctionList_t *list = (cFunctionList_t*)lam->cFunctionList;
@@ -3379,10 +3380,10 @@ static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_s
     if (crt == NULL)
         jl_error("cfunction: return type doesn't correspond to a C type");
     size_t i;
-    size_t nargs = jl_svec_len(lam->specTypes);
-    assert(nargs == jl_svec_len(argt));
+    size_t nargs = jl_nparams(lam->specTypes);
+    assert(nargs == jl_nparams(argt));
     for(i=0; i < nargs; i++) {
-        jl_value_t *tti = jl_svecref(lam->specTypes,i);
+        jl_value_t *tti = jl_tparam(lam->specTypes,i);
         if (tti == (jl_value_t*)jl_pointer_type) {
             jl_error("cfunction: argument type Ptr should have an element type, Ptr{T}");
         }
@@ -3396,7 +3397,7 @@ static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_s
     Type *prt = NULL;
     int sret = 0;
     std::string err_msg = generate_func_sig(&crt, &prt, sret, fargt, fargt_sig, inRegList, byRefList, attrs,
-                                            ((isref&1) ? (jl_value_t*)jl_any_type : jlrettype), argt);
+                                            ((isref&1) ? (jl_value_t*)jl_any_type : jlrettype), argt->parameters);
     if (!err_msg.empty())
         jl_error(err_msg.c_str());
     if (fargt.size() != fargt_sig.size())
@@ -3469,7 +3470,7 @@ static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_s
 
     for (size_t i=0; i < nargs; i++) {
         Value *val = AI++;
-        jl_value_t *jargty = jl_svecref(lam->specTypes, i);
+        jl_value_t *jargty = jl_tparam(lam->specTypes, i);
 
         // figure out how to unpack this type
         if (isref & (2<<i)) {
@@ -3616,12 +3617,12 @@ static Function *gen_jlcall_wrapper(jl_lambda_info_t *lam, jl_expr_t *ast, Funct
     allocate_gc_frame(0,&ctx);
     ctx.argSpaceInits = &b0->back();
 
-    size_t nargs = jl_svec_len(lam->specTypes);
+    size_t nargs = jl_nparams(lam->specTypes);
     size_t nfargs = f->getFunctionType()->getNumParams();
     Value **args = (Value**) alloca(nfargs*sizeof(Value*));
     unsigned idx = 0;
     for(size_t i=0; i < nargs; i++) {
-        jl_value_t *ty = jl_svecref(lam->specTypes, i);
+        jl_value_t *ty = jl_tparam(lam->specTypes, i);
         Type *lty = julia_type_to_llvm(ty);
         if (lty != NULL && type_is_ghost(lty))
             continue;
@@ -3789,13 +3790,13 @@ static Function *emit_function(jl_lambda_info_t *lam)
     if (!va && !hasCapt && lam->specTypes != NULL && lam->inferred) {
         // no captured vars and not vararg
         // consider specialized signature
-        for(size_t i=0; i < jl_svec_len(lam->specTypes); i++) {
-            if (isbits_spec(jl_svecref(lam->specTypes, i))) {
+        for(size_t i=0; i < jl_nparams(lam->specTypes); i++) {
+            if (isbits_spec(jl_tparam(lam->specTypes, i))) {
                 specsig = true;
                 break;
             }
         }
-        if (jl_svec_len(lam->specTypes) == 0)
+        if (jl_nparams(lam->specTypes) == 0)
             specsig = true;
         if (isbits_spec(jlrettype))
             specsig = true;
@@ -3821,8 +3822,8 @@ static Function *emit_function(jl_lambda_info_t *lam)
 
     if (specsig) {
         std::vector<Type*> fsig(0);
-        for(size_t i=0; i < jl_svec_len(lam->specTypes); i++) {
-            Type *ty = julia_type_to_llvm(jl_svecref(lam->specTypes,i));
+        for(size_t i=0; i < jl_nparams(lam->specTypes); i++) {
+            Type *ty = julia_type_to_llvm(jl_tparam(lam->specTypes,i));
             if (type_is_ghost(ty)) {
                 // mark as a ghost for now, we'll revise this later if needed as a local
                 ctx.vars[jl_decl_var(jl_cellref(largs,i))].isGhost = true;
@@ -3963,10 +3964,10 @@ static Function *emit_function(jl_lambda_info_t *lam)
 #else
             std::vector<Value*> ditypes(0);
 #endif
-            for(size_t i=0; i < jl_svec_len(lam->specTypes); i++) {
+            for(size_t i=0; i < jl_nparams(lam->specTypes); i++) {
                 if (ctx.vars[jl_decl_var(jl_cellref(largs,i))].isGhost)
                     continue;
-                ditypes.push_back(julia_type_to_di(jl_svecref(lam->specTypes,i),ctx.dbuilder,false));
+                ditypes.push_back(julia_type_to_di(jl_tparam(lam->specTypes,i),ctx.dbuilder,false));
             }
 #ifdef LLVM36
             subrty = ctx.dbuilder->createSubroutineType(fil,ctx.dbuilder->getOrCreateTypeArray(ditypes));
@@ -4284,7 +4285,7 @@ static Function *emit_function(jl_lambda_info_t *lam)
         Value *argPtr = NULL;
         jl_value_t *argType = NULL;
         if (specsig) {
-            argType = jl_svecref(lam->specTypes,i);
+            argType = jl_tparam(lam->specTypes,i);
             if (!vi.isGhost) {
                 argPtr = AI++;
                 argPtr = mark_julia_type(argPtr, argType);
@@ -4330,7 +4331,7 @@ static Function *emit_function(jl_lambda_info_t *lam)
                 builder.CreateStore(emit_unbox(dyn_cast<AllocaInst>(lv)->getAllocatedType(),
                                                theArg,
                                                lam->specTypes == NULL ? NULL :
-                                               jl_svecref(lam->specTypes,i)),
+                                               jl_tparam(lam->specTypes,i)),
                                     lv);
             }
         }
@@ -4562,8 +4563,8 @@ extern "C" void jl_fptr_to_llvm(void *fptr, jl_lambda_info_t *lam, int specsig)
         if (specsig) {
             jl_value_t *jlrettype = jl_ast_rettype(lam, (jl_value_t*)lam->ast);
             std::vector<Type*> fsig(0);
-            for(size_t i=0; i < jl_svec_len(lam->specTypes); i++) {
-                Type *ty = julia_type_to_llvm(jl_svecref(lam->specTypes,i));
+            for(size_t i=0; i < jl_nparams(lam->specTypes); i++) {
+                Type *ty = julia_type_to_llvm(jl_tparam(lam->specTypes,i));
                 if (!type_is_ghost(ty))
                     fsig.push_back(ty);
             }

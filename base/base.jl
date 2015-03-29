@@ -279,8 +279,6 @@ Array{T}(::Type{T}, m::Integer,n::Integer,o::Integer) = Array{T}(m,n,o)
 
 # SimpleVector
 
-length(v::SimpleVector) = v.length
-
 function getindex(v::SimpleVector, i::Int)
     if !(1 <= i <= length(v))
         throw(BoundsError())
@@ -288,6 +286,8 @@ function getindex(v::SimpleVector, i::Int)
     unsafe_load(convert(Ptr{Any},data_pointer_from_objref(v)) + i*sizeof(Ptr))
 end
 
+length(v::SimpleVector) = v.length
+endof(v::SimpleVector) = v.length
 start(v::SimpleVector) = 1
 next(v::SimpleVector,i) = (v[i],i+1)
 done(v::SimpleVector,i) = (i > v.length)

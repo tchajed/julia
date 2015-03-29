@@ -769,6 +769,9 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
         // should actually be a cache miss.
         need_guard_entries = 1;
     }
+    else {
+        type = jl_apply_tuple_type(newparams, 0);
+    }
 
     if (need_guard_entries) {
         temp = ml_matches(mt->defs, (jl_value_t*)type, lambda_sym, -1);
