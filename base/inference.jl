@@ -276,19 +276,21 @@ const getfield_tfunc = function (A, s0, name)
         if isType(s0)
             sp = s0.parameters[1]
             if isa(sp,DataType) && !any(x->isa(x,TypeVar), sp.parameters)
-                if fld === :parameters
-                    return Type{sp.parameters}
-                end
-                if fld === :types
-                    return Type{sp.types}
-                end
+                # TODO
+                #if fld === :parameters
+                #    return Type{sp.parameters}
+                #end
+                #if fld === :types
+                #    return Type{sp.types}
+                #end
                 if fld === :super
                     return Type{sp.super}
                 end
             end
         end
+        snames = s.name.names
         for i=1:nfields(s)
-            if is(s.names[i],fld)
+            if is(snames[i],fld)
                 R = s.types[i]
                 if s.parameters === ()
                     return R
@@ -857,7 +859,7 @@ function abstract_call(f, fargs, argtypes::Vector{Any}, vtypes, sv::StaticVarInf
         call_func = _ieval(:call)
         if isa(call_func,Function)
             return abstract_call(call_func, e.args,
-                                 totuplety(Any[abstract_eval_constant(f),argtypes...], isVA),
+                                 Any[abstract_eval_constant(f),argtypes...],
                                  vtypes, sv, e, isVA)
         else
             return Any

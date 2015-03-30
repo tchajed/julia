@@ -89,13 +89,23 @@ isgeneric(f::ANY) = (isa(f,Function) && isa(f.env,MethodTable))
 
 function_name(f::Function) = isgeneric(f) ? f.env.name : (:anonymous)
 
+function tt_cons(t::ANY, tup::ANY)
+    tup.va ? Tuple{t, tup.parameters..., ...} : Tuple{t, tup.parameters...}
+end
+
 code_lowered{T<:Tuple}(f::Function, t::Type{T}) = map(m->uncompressed_ast(m.func.code), methods(f,t))
 methods(f::Function,t::ANY) = Any[m[3] for m in _methods(f,t,-1)]
-methods(f::ANY,t::ANY) = methods(call, tuple(isa(f,Type) ? Type{f} : typeof(f), t...))
-_methods(f::ANY,t::ANY,lim) = _methods(f, Any[(t::Tuple)...], length(t::Tuple), lim, [])
+methods(f::ANY,t::ANY) = methods(call, tt_cons(isa(f,Type) ? Type{f} : typeof(f), t))
+function _methods(f::ANY,t::ANY,lim)
+    if t.va
+        ccall(:jl_matching_methods, Any, (Any,Any,Int32), f, t, lim)
+    else
+        _methods(f, Any[t.parameters...], length(t.parameters), lim, [])
+    end
+end
 function _methods(f::ANY,t::Array,i,lim::Integer,matching::Array{Any,1})
     if i == 0
-        new = ccall(:jl_matching_methods, Any, (Any,Any,Int32), f, tuple(t...), lim)
+        new = ccall(:jl_matching_methods, Any, (Any,Any,Int32), f, Tuple{t...}, lim)
         if new === false
             return false
         end
@@ -125,12 +135,12 @@ function methods(f::Function)
     f.env
 end
 
-methods(x::ANY) = methods(call, (isa(x,Type) ? Type{x} : typeof(x), Any...))
+methods(x::ANY) = methods(call, Tuple{isa(x,Type) ? Type{x} : typeof(x), Any, ...})
 
 function length(mt::MethodTable)
     n = 0
     d = mt.defs
-    while !is(d,())
+    while !is(d,nothing)
         n += 1
         d = d.next
     end

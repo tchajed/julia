@@ -399,23 +399,17 @@ JL_CALLABLE(jl_f_arraylen)
 
 JL_CALLABLE(jl_f_arraysize)
 {
-    if (nargs != 2) {
-        JL_NARGS(arraysize, 1, 1);
-    }
+    JL_NARGS(arraysize, 2, 2);
     JL_TYPECHK(arraysize, array, args[0]);
     jl_array_t *a = (jl_array_t*)args[0];
     size_t nd = jl_array_ndims(a);
-    if (nargs == 2) {
-        JL_TYPECHK(arraysize, long, args[1]);
-        int dno = jl_unbox_long(args[1]);
-        if (dno < 1)
-            jl_error("arraysize: dimension out of range");
-        if (dno > nd)
-            return jl_box_long(1);
-        return jl_box_long((&a->nrows)[dno-1]);
-    }
-    assert(0 && "DO THIS AT THE JULIA LEVEL");
-    return jl_nothing;
+    JL_TYPECHK(arraysize, long, args[1]);
+    int dno = jl_unbox_long(args[1]);
+    if (dno < 1)
+        jl_error("arraysize: dimension out of range");
+    if (dno > nd)
+        return jl_box_long(1);
+    return jl_box_long((&a->nrows)[dno-1]);
 }
 
 jl_value_t *jl_arrayref(jl_array_t *a, size_t i)

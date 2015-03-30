@@ -739,7 +739,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
             }
         }
         //type = limited;
-        //temp2 = jl_apply_tuple_type(limited, 
+        //temp2 = jl_apply_tuple_type(limited,
         if (all_are_subtypes) {
             // avoid Type{Type{...}...}...
             if (jl_is_type_type(lasttype) && jl_is_type_type(jl_tparam0(lasttype)))
@@ -1606,7 +1606,7 @@ static void show_call(jl_value_t *F, jl_value_t **args, uint32_t nargs)
         if (i > 0) jl_printf(JL_STDOUT, ", ");
         jl_static_show(JL_STDOUT, jl_typeof(args[i]));
     }
-    jl_printf(JL_STDOUT, ")\n");
+    jl_printf(JL_STDOUT, ")");
 }
 #endif
 
@@ -1632,6 +1632,10 @@ JL_CALLABLE(jl_apply_generic)
     jl_function_t *mfunc = jl_method_table_assoc_exact(mt, args, nargs);
 
     if (mfunc != jl_bottom_func) {
+#ifdef JL_TRACE
+        if (trace_en)
+            jl_printf(JL_STDOUT, " at %s:%d\n", mfunc->linfo->file->name, mfunc->linfo->line);
+#endif
         if (mfunc->linfo != NULL &&
             (mfunc->linfo->inInference || mfunc->linfo->inCompile)) {
             // if inference is running on this function, return a copy
@@ -1664,6 +1668,10 @@ JL_CALLABLE(jl_apply_generic)
         jl_no_method_error((jl_function_t*)F, args, nargs);
         // unreachable
     }
+#ifdef JL_TRACE
+    if (trace_en)
+        jl_printf(JL_STDOUT, " at %s:%d\n", mfunc->linfo->file->name, mfunc->linfo->line);
+#endif
     assert(!mfunc->linfo || !mfunc->linfo->inInference);
     jl_value_t *res = jl_apply(mfunc, args, nargs);
     JL_GC_POP();
@@ -1895,7 +1903,7 @@ static jl_value_t *ml_matches(jl_methlist_t *ml, jl_value_t *type,
                 // the "limited" mode used by type inference.
                 size_t l = jl_array_len(t);
                 for(i=0; i < l; i++) {
-                    jl_value_t *prior_ti = jl_tparam0(jl_cellref(t,i));
+                    jl_value_t *prior_ti = jl_svecref(jl_cellref(t,i),0);
                     if (jl_is_leaf_type(prior_ti) && jl_subtype(ti, prior_ti, 0)) {
                         skip = 1;
                         break;
