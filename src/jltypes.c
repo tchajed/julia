@@ -54,7 +54,7 @@ jl_datatype_t *jl_number_type;
 jl_datatype_t *jl_complex_type;
 jl_datatype_t *jl_signed_type;
 
-jl_value_t *jl_emptytuple;
+jl_value_t *jl_emptytuple=NULL;
 jl_svec_t *jl_emptysvec;
 jl_value_t *jl_nothing;
 
@@ -1821,8 +1821,12 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     }
 
     // always use original type constructor
-    if (!istuple && tc != (jl_value_t*)dt) {
-        return (jl_value_t*)jl_apply_type_(tc, iparams, ntp);
+    if (!istuple) {
+        if (tc != (jl_value_t*)dt)
+            return (jl_value_t*)jl_apply_type_(tc, iparams, ntp);
+    }
+    else if (ntp == 0 && jl_emptytuple != NULL) {
+        return jl_typeof(jl_emptytuple);
     }
 
     jl_datatype_t *ndt=NULL;
@@ -1989,8 +1993,6 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
     assert(tn==jl_tuple_typename || ntp == jl_svec_len(((jl_datatype_t*)tc)->parameters));
     jl_value_t **iparams;
     JL_GC_PUSHARGS(iparams, ntp);
-    //jl_value_t **rt1 = &iparams[ntp+0];  // some extra gc roots
-    //jl_value_t **rt2 = &iparams[ntp+1];
     int cacheable = 1, isabstract = 0, bound = 0;
     for(i=0; i < ntp; i++) {
         jl_value_t *elt = jl_svecref(tp, i);
@@ -3016,8 +3018,7 @@ void jl_init_types(void)
     jl_ntuple_typename = jl_ntuple_type->name;
 
     jl_tupletype_t *empty_tuple_type = jl_apply_tuple_type(jl_emptysvec, 0);
-    jl_emptytuple = newstruct(empty_tuple_type);
-    ((jl_datatype_t*)empty_tuple_type)->instance = jl_emptytuple;
+    jl_emptytuple = ((jl_datatype_t*)empty_tuple_type)->instance;
 
     // non-primitive definitions follow
     jl_int32_type = NULL;

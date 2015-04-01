@@ -519,7 +519,6 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
         int set_to_any = 0;
         if (decl_i == jl_ANY_flag) {
             // don't specialize on slots marked ANY
-            temp = jl_tparam(type, i);
             jl_svecset(newparams, i, (jl_value_t*)jl_any_type);
             temp2 = (jl_value_t*)jl_svec_copy(newparams);
             temp2 = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)temp2, type->va);
@@ -539,7 +538,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
             if (nintr) {
                 // TODO: even if different specializations of this slot need
                 // separate cache entries, have them share code.
-                jl_svecset(newparams, i, temp);
+                jl_svecset(newparams, i, jl_tparam(type, i));
             }
             else {
                 set_to_any = 1;
@@ -554,7 +553,6 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
               specific. determined with a type intersection.
             */
             int might_need_guard=0;
-            temp = jl_tparam(type, i);
             if (i < jl_nparams(decl)) {
                 jl_value_t *declt = jl_tparam(decl,i);
                 // note: ignore va flag (for T..., intersect with T)
@@ -579,7 +577,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
                 jl_svecset(newparams, i, (jl_value_t*)jl_anytuple_type);
                 might_need_guard = 1;
             }
-            assert(jl_tparam(type,i) != (jl_value_t*)jl_bottom_type);
+            assert(jl_svecref(newparams,i) != (jl_value_t*)jl_bottom_type);
             if (might_need_guard) {
                 jl_methlist_t *curr = mt->defs;
                 // can't generalize type if there's an overlapping definition
@@ -587,12 +585,13 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
                 // TODO: it seems premature to take these intersections
                 // before the whole signature has been generalized.
                 // example ((T...,),S,S,S,S,S,S,S,S,S,S,S,S,S,S,S,S,...)
+                temp2 = (jl_value_t*)jl_svec_copy(newparams);
+                temp2 = (jl_value_t*)jl_apply_tuple_type((jl_svec_t*)temp2, type->va);
                 while (curr != (void*)jl_nothing && curr->func!=method) {
                     if (curr->tvars!=jl_emptysvec &&
-                        jl_type_intersection((jl_value_t*)curr->sig,
-                                             (jl_value_t*)type) !=
+                        jl_type_intersection((jl_value_t*)curr->sig, (jl_value_t*)temp2) !=
                         (jl_value_t*)jl_bottom_type) {
-                        jl_svecset(newparams, i, temp);
+                        jl_svecset(newparams, i, jl_tparam(type, i));
                         might_need_guard = 0;
                         break;
                     }
@@ -738,15 +737,10 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
                 break;
             }
         }
-        //type = limited;
-        //temp2 = jl_apply_tuple_type(limited,
         if (all_are_subtypes) {
             // avoid Type{Type{...}...}...
             if (jl_is_type_type(lasttype) && jl_is_type_type(jl_tparam0(lasttype)))
                 lasttype = (jl_value_t*)jl_type_type;
-            //temp = (jl_value_t*)jl_tuple1(lasttype);
-            //jl_tupleset(type, i, jl_apply_type((jl_value_t*)jl_vararg_type,
-            //                                   (jl_tuple_t*)temp));
             jl_svecset(limited, i, lasttype);
         }
         else {
@@ -759,7 +753,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
             }
             jl_svecset(limited, i, lastdeclt);
         }
-        type = jl_apply_tuple_type(limited, 1);
+        temp2 = type = jl_apply_tuple_type(limited, 1);
         // now there is a problem: the computed signature is more
         // general than just the given arguments, so it might conflict
         // with another definition that doesn't have cache instances yet.
@@ -770,7 +764,7 @@ static jl_function_t *cache_method(jl_methtable_t *mt, jl_tupletype_t *type,
         need_guard_entries = 1;
     }
     else {
-        type = jl_apply_tuple_type(newparams, 0);
+        temp2 = type = jl_apply_tuple_type(newparams, 0);
     }
 
     if (need_guard_entries) {
@@ -1617,7 +1611,8 @@ JL_CALLABLE(jl_apply_generic)
     mt->ncalls++;
 #endif
 #ifdef JL_TRACE
-    if (trace_en)
+    int traceen = trace_en; //&& ((char*)&mt < jl_stack_hi-6000000);
+    if (traceen)
         show_call(F, args, nargs);
 #endif
     /*
@@ -1633,7 +1628,7 @@ JL_CALLABLE(jl_apply_generic)
 
     if (mfunc != jl_bottom_func) {
 #ifdef JL_TRACE
-        if (trace_en)
+        if (traceen)
             jl_printf(JL_STDOUT, " at %s:%d\n", mfunc->linfo->file->name, mfunc->linfo->line);
 #endif
         if (mfunc->linfo != NULL &&
@@ -1669,7 +1664,7 @@ JL_CALLABLE(jl_apply_generic)
         // unreachable
     }
 #ifdef JL_TRACE
-    if (trace_en)
+    if (traceen)
         jl_printf(JL_STDOUT, " at %s:%d\n", mfunc->linfo->file->name, mfunc->linfo->line);
 #endif
     assert(!mfunc->linfo || !mfunc->linfo->inInference);

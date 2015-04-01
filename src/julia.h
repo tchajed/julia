@@ -498,11 +498,13 @@ static inline void gc_wb_back(void *ptr) // ptr isa jl_value_t*
 
 STATIC_INLINE jl_value_t *jl_svecref(void *t, size_t i)
 {
+    assert(jl_typeis(t,jl_simplevector_type));
     assert(i < jl_svec_len(t));
     return jl_svec_data(t)[i];
 }
 STATIC_INLINE jl_value_t *jl_svecset(void *t, size_t i, void *x)
 {
+    assert(jl_typeis(t,jl_simplevector_type));
     assert(i < jl_svec_len(t));
     jl_svec_data(t)[i] = (jl_value_t*)x;
     if (x) gc_wb(t, x);

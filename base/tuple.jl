@@ -1,7 +1,7 @@
 ## indexing ##
 
-nfields(t::DataType) = length(t.types)
-nfields(v) = nfields(typeof(v))
+nfields(t::DataType) = t.types.length
+nfields(v) = typeof(v).types.length
 
 length(t::Tuple) = nfields(t)
 endof(t::Tuple) = length(t)
