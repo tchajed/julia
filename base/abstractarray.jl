@@ -4,6 +4,10 @@ typealias AbstractVector{T} AbstractArray{T,1}
 typealias AbstractMatrix{T} AbstractArray{T,2}
 typealias AbstractVecOrMat{T} Union(AbstractVector{T}, AbstractMatrix{T})
 
+## Definitions from operators.jl ##
+index_lengths_dim(A, dim, i::AbstractVector{Bool}, I...) = tuple(sum(i), index_lengths_dim(A, dim+1, I...)...)
+index_shape_dim(A, dim, i::AbstractVector{Bool}, I...) = tuple(sum(i), index_shape_dim(A, dim+1, I...)...)
+
 ## Basic functions ##
 
 vect() = Array(Any, 0)

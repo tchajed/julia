@@ -224,7 +224,7 @@ function promote_shape(a::Dims, b::Dims)
     return a
 end
 
-# The lengths of the given indices, lowering : to the appropriate size
+# Recursively compute the lengths of a list of indices
 index_lengths(A::AbstractArray, I...) = index_lengths_dim(A, 1, I...)
 index_lengths_dim(A, dim)                = ()
 index_lengths_dim(A, dim, ::Colon)       = dim == 1 ? (length(A),) : (trailingsize(A, dim),)
