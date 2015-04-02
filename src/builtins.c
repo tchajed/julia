@@ -1335,6 +1335,9 @@ size_t jl_static_show_x(JL_STREAM *out, jl_value_t *v, int depth)
                 }
                 n += jl_printf(out, "}");
             }
+            else if (jl_is_tuple_type(dv)) {
+                n += jl_printf(out, "{}");
+            }
         }
     }
     else if (jl_is_func(v)) {

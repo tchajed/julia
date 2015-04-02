@@ -431,7 +431,7 @@ static jl_value_t *nth_slot_type(jl_tupletype_t *sig, size_t i)
 
 static int very_general_type(jl_value_t *t)
 {
-    return (t && (t==(jl_value_t*)jl_any_type ||
+    return (t && (t==(jl_value_t*)jl_any_type || t == (jl_value_t*)jl_type_type ||
                   (jl_is_typevar(t) &&
                    ((jl_tvar_t*)t)->ub==(jl_value_t*)jl_any_type)));
 }
@@ -1834,8 +1834,7 @@ void jl_add_method(jl_function_t *gf, jl_tupletype_t *types, jl_function_t *meth
     JL_GC_POP();
 }
 
-DLLEXPORT jl_svec_t *jl_match_method(jl_value_t *type, jl_value_t *sig,
-                                     jl_svec_t *tvars)
+DLLEXPORT jl_svec_t *jl_match_method(jl_value_t *type, jl_value_t *sig, jl_svec_t *tvars)
 {
     jl_svec_t *env = jl_emptysvec;
     jl_value_t *ti=NULL;

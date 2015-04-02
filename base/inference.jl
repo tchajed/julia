@@ -158,19 +158,7 @@ t_func[arraylen] = (1, 1, x->Int)
 #t_func[arrayref] = (2,Inf,(a,i...)->(isa(a,DataType) && a<:Array ?
 #                                     a.parameters[1] : Any))
 #t_func[arrayset] = (3, Inf, (a,v,i...)->a)
-#arraysize_tfunc(a, d) = Int
-arraysize_tfunc = function (a, d...)
-    if !is(d,())
-        return Int
-    end
-    if isa(a,DataType) && a<:Array
-        N = a.parameters[2]
-        return isa(N,Int) ? NTuple{N,Int} : (Int...)
-    else
-        return (Int...)
-    end
-end
-t_func[arraysize] = (1, 2, arraysize_tfunc)
+t_func[arraysize] = (2, 2, (a,d)->Int)
 t_func[pointerref] = (2,2,(a,i)->(isa(a,DataType) && a<:Ptr ? a.parameters[1] : Any))
 t_func[pointerset] = (3, 3, (a,v,i)->a)
 
@@ -360,7 +348,7 @@ function extract_simple_tparam(Ai)
 end
 
 # TODO: handle e.g. apply_type(T, R::Union(Type{Int32},Type{Float64}))
-const apply_type_tfunc = function (A, args...)
+const apply_type_tfunc = function (A, _isva_, args...)
     lA = length(A)
     isVA = Any
     if lA > 0
@@ -368,8 +356,8 @@ const apply_type_tfunc = function (A, args...)
             isVA = A[1]
         end
         A = A[2:end]
+        lA -= 1
     end
-    args = args[2:end]
     if !isType(args[1])
         return Type
     end
@@ -377,7 +365,7 @@ const apply_type_tfunc = function (A, args...)
     if isa(headtype,UnionType) || isa(headtype,TypeVar)
         return args[1]
     end
-    istuple = (headtype == Tuple)
+    istuple = (headtype === Tuple)
     if isVA===true && !istuple
         return Type
     end
@@ -744,7 +732,7 @@ function invoke_tfunc(f, types, argtype)
         if typeseq(m[1],types)
             tvars = m[2][1:2:end]
             (ti, env) = ccall(:jl_match_method, Any, (Any,Any,Any),
-                              argtype, m[1], tvars)::Tuple{Any,Any}
+                              argtype, m[1], tvars)::SimpleVector
             (_tree,rt) = typeinf(linfo, ti, env, linfo)
             return rt
         end
@@ -1356,9 +1344,6 @@ function typeinf_uncached(linfo::LambdaStaticData, atypes::ANY, sparams::SimpleV
     #if dbg
     #    print("typeinf ", linfo.name, " ", object_id(ast0), "\n")
     #end
-    #if trace_inf
-    #    print("typeinf ", linfo.name, " ", atypes, " ", linfo.file,":",linfo.line,"\n")
-    #end
     # if isdefined(:STDOUT)
     #     write(STDOUT, "typeinf ")
     #     write(STDOUT, string(linfo.name))
@@ -1388,6 +1373,10 @@ function typeinf_uncached(linfo::LambdaStaticData, atypes::ANY, sparams::SimpleV
         end
         f = f.prev
     end
+
+    #if trace_inf
+    #    print("typeinf ", linfo.name, " ", atypes, " ", linfo.file,":",linfo.line,"\n")
+    #end
 
     #if dbg print("typeinf ", linfo.name, " ", atypes, "\n") end
 
@@ -2166,7 +2155,7 @@ end
 # functions with closure environments or varargs are also excluded.
 # static parameters are ok if all the static parameter values are leaf types,
 # meaning they are fully known.
-function inlineable(f::ANY, e::Expr, atype::Type, sv::StaticVarInfo, enclosing_ast::Expr)
+function inlineable(f::ANY, e::Expr, atype::ANY, sv::StaticVarInfo, enclosing_ast::Expr)
     if !(isa(f,Function) || isa(f,IntrinsicFunction))
         return NF
     end
@@ -2870,7 +2859,8 @@ function inlining_pass(e::Expr, sv, ast)
                             newargs[i-3] = Any[ QuoteNode(x) for x in aarg ]
                         elseif (t<:Tuple) && !t.va && effect_free(aarg,sv,true)
                             # apply(f,t::(x,y)) => f(t[1],t[2])
-                            newargs[i-3] = Any[ mk_getfield(aarg,j,t[j]) for j=1:length(t) ]
+                            tp = t.parameters
+                            newargs[i-3] = Any[ mk_getfield(aarg,j,tp[j]) for j=1:length(tp) ]
                         else
                             # not all args expandable
                             return (e,stmts)

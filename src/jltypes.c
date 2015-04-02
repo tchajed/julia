@@ -1861,7 +1861,7 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
     ndt->ditype = NULL;
     ndt->size = 0;
     ndt->alignment = 1;
-    ndt->va = 0;
+    ndt->va = (dt->va && dt != jl_anytuple_type);
 
     if (istuple)
         ndt->super = jl_any_type;
@@ -1994,6 +1994,9 @@ static jl_value_t *inst_type_w_(jl_value_t *t, jl_value_t **env, size_t n,
     jl_value_t **iparams;
     JL_GC_PUSHARGS(iparams, ntp);
     int cacheable = 1, isabstract = 0, bound = 0;
+    if (tn == jl_tuple_typename && tt->va) {
+        cacheable = 0; isabstract = 1;
+    }
     for(i=0; i < ntp; i++) {
         jl_value_t *elt = jl_svecref(tp, i);
         if (elt == t) {
