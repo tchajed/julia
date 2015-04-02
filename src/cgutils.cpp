@@ -1667,9 +1667,8 @@ static void emit_checked_write_barrier(jl_codectx_t *ctx, Value *parent, Value *
 }
 
 static Value *emit_setfield(jl_datatype_t *sty, Value *strct, size_t idx0,
-                          Value *rhs, jl_codectx_t *ctx, bool checked, bool wb)
+                            Value *rhs, jl_codectx_t *ctx, bool checked, bool wb)
 {
-    assert(strct->getType() == jl_pvalue_llvmt);
     if (sty->mutabl || !checked) {
         Value *addr =
             builder.CreateGEP(builder.CreateBitCast(strct, T_pint8),
@@ -1715,8 +1714,12 @@ static Value *emit_new_struct(jl_value_t *ty, size_t nargs, jl_value_t **args, j
                 Value *fval = emit_unbox(fty, emit_unboxed(args[i+1],ctx), jtype);
                 if (fty == T_int1)
                     fval = builder.CreateZExt(fval, T_int8);
-                strct = builder.
-                    CreateInsertValue(strct, fval, ArrayRef<unsigned>(&idx,1));
+                if (lt->isVectorTy()) {
+                    strct = builder.CreateInsertElement(strct, fval, ConstantInt::get(T_int32,idx));
+                }
+                else {
+                    strct = builder.CreateInsertValue(strct, fval, ArrayRef<unsigned>(&idx,1));
+                }
                 idx++;
             }
             return mark_julia_type(strct,ty);

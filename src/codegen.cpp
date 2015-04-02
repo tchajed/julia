@@ -1742,6 +1742,8 @@ static Value *emit_f_is(jl_value_t *rt1, jl_value_t *rt2,
     bool isleaf = jl_is_leaf_type(rt1) && jl_is_leaf_type(rt2);
     bool isteq = jl_types_equal(rt1, rt2);
     bool isbits = isleaf && isteq && jl_is_bitstype(rt1);
+    if (isteq && isleaf && jl_is_datatype_singleton((jl_datatype_t*)rt1))
+        return ConstantInt::get(T_int1, 1);
     if (arg1 && !varg1) {
         varg1 = isbits ? auto_unbox(arg1, ctx) : emit_expr(arg1, ctx);
         if (arg2 && !varg2 && !isbits && varg1->getType() == jl_pvalue_llvmt &&
@@ -1975,15 +1977,21 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
             JL_GC_POP();
             return tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlemptytuple_var)));
         }
+        /*
         size_t i;
         for(i=0; i < nargs; i++) {
             jl_value_t *it = (jl_value_t*)expr_type(args[i+1],ctx);
             if (!(jl_isbits(it) && jl_is_leaf_type(it)))
                 break;
         }
-        if (i >= nargs && ctx->linfo->specTypes) {
+        */
+        if (ctx->linfo->specTypes) {
             rt1 = expr_type(expr, ctx);
-            if (jl_is_tuple_type(rt1) && nargs == jl_datatype_nfields(rt1)) {
+            if (jl_is_tuple_type(rt1) && jl_is_leaf_type(rt1) && nargs == jl_datatype_nfields(rt1)) {
+                Value *tpl = emit_new_struct(rt1, nargs, &args[1], ctx);
+                JL_GC_POP();
+                return tpl;
+                /*
                 for(i=0; i < nargs; i++) {
                     // paranoia: make sure the inferred tuple type matches what
                     // we are about to construct.
@@ -2012,6 +2020,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                         return mark_julia_type(tpl, rt1);
                     return tpl;
                 }
+                */
             }
         }
 
